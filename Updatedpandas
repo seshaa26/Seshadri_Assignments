@@ -1,0 +1,79 @@
+import os
+import shutil
+import re
+import pandas as pd
+import csv
+
+# --- Configuration ---
+source_folder = './all_files'       
+destination_folder = './matched_files'
+keywords_file = 'ids.csv'           
+column_name = 'ID_Number'           # Ensure this matches your CSV header exactly
+log_file = 'match_log.csv' 
+
+def copy_and_log_files():
+    # 1. Load keywords with "Scientific Notation" Protection
+    try:
+        # We read everything as strings first
+        df = pd.read_csv(keywords_file, dtype=str)
+        
+        # Clean the data: remove decimals (if Excel added .0) and whitespace
+        keywords = df[column_name].str.replace(r'\.0$', '', regex=True).str.strip().tolist()
+        
+        # Remove any empty values
+        keywords = [k for k in keywords if k and k != 'nan']
+        
+        print(f"--- Debug: ID List ---")
+        print(f"Loaded {len(keywords)} unique IDs.")
+        print(f"Sample IDs Python is looking for: {keywords[:3]}") 
+        print(f"----------------------\n")
+        
+    except Exception as e:
+        print(f"Error loading CSV: {e}")
+        return
+
+    # 2. The "Greedy" Regex Pattern
+    # \S* matches everything attached to the ID until a space is hit
+    pattern = re.compile(r'\S*(?:' + '|'.join(map(re.escape, keywords)) + r')\S*')
+
+    if not os.path.exists(destination_folder):
+        os.makedirs(destination_folder)
+
+    # 3. Process and Log
+    with open(log_file, 'w', newline='', encoding='utf-8') as log_csv:
+        log_writer = csv.writer(log_csv)
+        log_writer.writerow(['Filename', 'Full_String_Found'])
+
+        # Get list of files
+        all_files = [f for f in os.listdir(source_folder) if f.endswith(".txt")]
+        print(f"Scanning {len(all_files)} files in '{source_folder}'...")
+
+        match_count = 0
+        for filename in all_files:
+            file_path = os.path.join(source_folder, filename)
+            try:
+                # Using 'latin-1' to avoid crashes on special characters
+                with open(file_path, 'r', encoding='latin-1') as f:
+                    content = f.read()
+                    
+                    # findall extracts the full string (prefix + ID + suffix)
+                    matches = pattern.findall(content)
+                    
+                    if matches:
+                        shutil.copy(file_path, destination_folder)
+                        match_count += 1
+                        
+                        # Log each unique match found in this specific file
+                        for m in set(matches):
+                            log_writer.writerow([filename, m])
+                            print(f"SUCCESS: Match found in {filename} -> {m}")
+                            
+            except Exception as e:
+                print(f"Error reading {filename}: {e}")
+
+    print(f"\n--- Final Summary ---")
+    print(f"Total Files Copied: {match_count}")
+    print(f"Detailed log saved to: {log_file}")
+
+if __name__ == "__main__":
+    copy_and_log_files()
