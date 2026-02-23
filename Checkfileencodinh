@@ -1,0 +1,70 @@
+import os
+import shutil
+import re
+import pandas as pd
+import csv
+
+# --- Configuration ---
+source_folder = './all_files'       
+destination_folder = './matched_files'
+keywords_file = 'ids.csv'           
+column_name = 'ID_Number'           
+log_file = 'match_log.csv' 
+
+def copy_and_log_files():
+    # 1. Load keywords - Forced Clean String
+    try:
+        df = pd.read_csv(keywords_file, dtype=str)
+        # Ensure we remove any scientific notation or decimals
+        keywords = df[column_name].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().tolist()
+        keywords = [k for k in keywords if len(k) > 10]
+        print(f"Loaded {len(keywords)} IDs. Ready to scan.")
+    except Exception as e:
+        print(f"Error loading CSV: {e}")
+        return
+
+    # 2. Build the pattern
+    # We use a non-capturing group for the IDs
+    pattern = re.compile(r'(?:' + '|'.join(map(re.escape, keywords)) + r')')
+
+    if not os.path.exists(destination_folder):
+        os.makedirs(destination_folder)
+
+    # 3. The Scanning Loop
+    with open(log_file, 'w', newline='', encoding='utf-8') as log_csv:
+        log_writer = csv.writer(log_csv)
+        log_writer.writerow(['Filename', 'Matched_ID', 'Encoding_Used'])
+
+        all_files = [f for f in os.listdir(source_folder) if f.endswith(".txt")]
+        
+        for filename in all_files:
+            file_path = os.path.join(source_folder, filename)
+            content = None
+            encoding_success = None
+
+            # Try common encodings one by one
+            # utf-16 is very common for large Windows-generated text files
+            for enc in ['utf-8', 'utf-16', 'latin-1', 'cp1252']:
+                try:
+                    with open(file_path, 'r', encoding=enc) as f:
+                        # For 18MB files, we can read the whole thing
+                        content = f.read()
+                        encoding_success = enc
+                        break # If it opens, stop trying other encodings
+                except (UnicodeDecodeError, Exception):
+                    continue
+
+            if content and encoding_success:
+                match = pattern.search(content)
+                if match:
+                    shutil.copy(file_path, destination_folder)
+                    found_id = match.group(0)
+                    log_writer.writerow([filename, found_id, encoding_success])
+                    print(f"!! MATCH FOUND [{encoding_success}]: {filename} -> {found_id}")
+            else:
+                print(f"Skipping {filename}: Could not determine encoding.")
+
+    print("\n--- Scan Finished ---")
+
+if __name__ == "__main__":
+    copy_and_log_files()
