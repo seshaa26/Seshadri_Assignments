@@ -1,0 +1,70 @@
+import os
+import shutil
+import re
+import pandas as pd
+import csv
+
+# --- Configuration ---
+source_folder = './all_files'       
+destination_folder = './matched_files'
+keywords_file = 'ids.csv'           
+column_name = 'ID_Number'           
+log_file = 'match_log.csv' 
+
+def copy_and_log_files():
+    # 1. Load keywords and create "Fuzzy" patterns
+    try:
+        df = pd.read_csv(keywords_file, dtype=str)
+        raw_keywords = df[column_name].str.replace(r'\.0$', '', regex=True).str.strip().tolist()
+        
+        # We create a pattern that allows for optional dashes, spaces, or dots between digits
+        # Example: 12345678 becomes 1[-.\s]*2[-.\s]*3...
+        fuzzy_keywords = []
+        for kw in raw_keywords:
+            if len(kw) >= 10:
+                # Insert "allowable separator" regex between every character
+                fuzzy_kw = r'[-.\s]*'.join(list(map(re.escape, kw)))
+                fuzzy_keywords.append(fuzzy_kw)
+        
+        print(f"Loaded {len(fuzzy_keywords)} IDs with fuzzy matching enabled.")
+    except Exception as e:
+        print(f"Error loading CSV: {e}")
+        return
+
+    # Create the Master Pattern (Case Insensitive)
+    pattern = re.compile(r'(' + '|'.join(fuzzy_keywords) + r')', re.IGNORECASE)
+
+    if not os.path.exists(destination_folder):
+        os.makedirs(destination_folder)
+
+    with open(log_file, 'w', newline='', encoding='utf-8') as log_csv:
+        log_writer = csv.writer(log_csv)
+        log_writer.writerow(['Filename', 'Matched_String'])
+
+        all_files = [f for f in os.listdir(source_folder) if f.endswith(".txt")]
+        
+        for filename in all_files:
+            file_path = os.path.join(source_folder, filename)
+            try:
+                # READ IN BINARY MODE: This is the "Nuclear Option" for encoding issues
+                with open(file_path, 'rb') as f:
+                    # We read the raw bytes and decode them to latin-1 (which never fails)
+                    raw_data = f.read().decode('latin-1', errors='ignore')
+                    
+                    match = pattern.search(raw_data)
+                    if match:
+                        shutil.copy(file_path, destination_folder)
+                        log_writer.writerow([filename, match.group(0)])
+                        print(f"MATCH FOUND: {filename} -> {match.group(0)}")
+                    else:
+                        # For the first 3 files, print a snippet to the terminal for you to see
+                        if all_files.index(filename) < 3:
+                            print(f"Scanning {filename}... First 50 chars: {raw_data[:50]}")
+                            
+            except Exception as e:
+                print(f"Error processing {filename}: {e}")
+
+    print("\nDeep Scan Complete.")
+
+if __name__ == "__main__":
+    copy_and_log_files()
