@@ -1,0 +1,68 @@
+import os
+import shutil
+import re
+import pandas as pd
+import csv
+
+# --- Configuration ---
+source_folder = './all_files'       
+destination_folder = './matched_files'
+keywords_file = 'ids.csv'           
+column_name = 'ID_Number'           
+log_file = 'match_log.csv' 
+
+def copy_and_log_files():
+    # 1. Load keywords and force them to be clean strings
+    try:
+        df = pd.read_csv(keywords_file, dtype=str)
+        # This removes decimals, scientific notation symbols, and spaces
+        keywords = df[column_name].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().tolist()
+        keywords = [k for k in keywords if len(k) >= 10] # Ensure we aren't searching for empty strings
+        
+        print(f"--- Loaded {len(keywords)} IDs ---")
+        print(f"DEBUG: Searching for ID: '{keywords[0]}'")
+    except Exception as e:
+        print(f"Error loading CSV: {e}")
+        return
+
+    # 2. Build the Regex
+    # We remove the \S* for a moment to see if a simple search works first
+    pattern = re.compile('|'.join(map(re.escape, keywords)))
+
+    if not os.path.exists(destination_folder):
+        os.makedirs(destination_folder)
+
+    with open(log_file, 'w', newline='', encoding='utf-8') as log_csv:
+        log_writer = csv.writer(log_csv)
+        log_writer.writerow(['Filename', 'Matched_ID'])
+
+        all_files = [f for f in os.listdir(source_folder) if f.endswith(".txt")]
+        
+        for filename in all_files:
+            file_path = os.path.join(source_folder, filename)
+            try:
+                # 3. Use 'utf-8' with 'ignore' for large files
+                # This prevents the script from stopping if it hits a single bad character
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                    
+                    match = pattern.search(content) # search is faster than findall for large text
+                    
+                    if match:
+                        shutil.copy(file_path, destination_folder)
+                        # To log the specific ID that matched:
+                        found_id = match.group(0)
+                        log_writer.writerow([filename, found_id])
+                        print(f"!! MATCH FOUND: {filename} contains {found_id}")
+                    else:
+                        # DEBUG: Print this only for the first 5 files to see if it's scanning
+                        if all_files.index(filename) < 5:
+                            print(f"Scanned {filename}... no match.")
+
+            except Exception as e:
+                print(f"Failed to read {filename}: {e}")
+
+    print("\nScan Finished.")
+
+if __name__ == "__main__":
+    copy_and_log_files()
