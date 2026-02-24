@@ -1,0 +1,35 @@
+import os
+import shutil
+
+SOURCE_DIR = r"D:input_folder"      # folder with ~300 text files
+DEST_DIR   = r"D:output_folder"     # folder where matching files will be copied
+KEY        = "1234567890123456"      # your 16-digit key as a string
+
+os.makedirs(DEST_DIR, exist_ok=True)
+
+for root, dirs, files in os.walk(SOURCE_DIR):
+    for name in files:
+        if not name.lower().endswith(".txt"):
+            continue  # only text files
+
+        file_path = os.path.join(root, name)
+
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                # read in chunks to handle large files
+                found = False
+                while True:
+                    chunk = f.read(1024 * 1024)  # 1 MB
+                    if not chunk:
+                        break
+                    if KEY in chunk:
+                        found = True
+                        break
+        except Exception as e:
+            print(f"Error reading {file_path}: {e}")
+            continue
+
+        if found:
+            dest_path = os.path.join(DEST_DIR, name)
+            shutil.copy2(file_path, dest_path)
+            print(f"Copied (key found): {file_path} -> {dest_path}")
