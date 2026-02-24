@@ -2,19 +2,18 @@ import os
 import re
 import shutil
 
-SOURCE_DIR = r"D:input_folder"      # folder with ~300 text files
-DEST_DIR   = r"D:output_folder2"    # another folder (or same) for matches
-PREFIX     = "ABC"                   # required prefix before the 16-digit key
+SOURCE_DIR = r"D:input_folder"
+DEST_DIR   = r"D:output_folder_with_prefix"
 
-# regex: PREFIX followed by exactly 16 digits
-pattern = re.compile(re.escape(PREFIX) + r"d{16}")
+# regex: one or more alphanumeric chars, then exactly 16 digits
+pattern = re.compile(r"[A-Za-z0-9]+d{16}")
 
 os.makedirs(DEST_DIR, exist_ok=True)
 
 for root, dirs, files in os.walk(SOURCE_DIR):
     for name in files:
         if not name.lower().endswith(".txt"):
-            continue  # only text files
+            continue
 
         file_path = os.path.join(root, name)
 
@@ -25,6 +24,7 @@ for root, dirs, files in os.walk(SOURCE_DIR):
                     chunk = f.read(1024 * 1024)  # 1 MB
                     if not chunk:
                         break
+
                     if pattern.search(chunk):
                         found = True
                         break
@@ -35,4 +35,4 @@ for root, dirs, files in os.walk(SOURCE_DIR):
         if found:
             dest_path = os.path.join(DEST_DIR, name)
             shutil.copy2(file_path, dest_path)
-            print(f"Copied (prefixed key found): {file_path} -> {dest_path}")
+            print(f"Copied (alnum prefix + 16-digit key found): {file_path} -> {dest_path}")
