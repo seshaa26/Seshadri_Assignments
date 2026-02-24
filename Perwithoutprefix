@@ -1,35 +1,74 @@
 import os
-import shutil
+import csv
+import re
 
-SOURCE_DIR = r"D:input_folder"      # folder with ~300 text files
-DEST_DIR   = r"D:output_folder"     # folder where matching files will be copied
-KEY        = "1234567890123456"      # your 16-digit key as a string
+SOURCE_DIR = r"D:input_folder"      # folder containing text files
+KEYS_CSV   = r"D:keys.csv"          # CSV with list of 16-digit keys (first column)
+OUT_MATCHES = r"D:matches_no_prefix.txt"
+LOG_CSV     = r"D:log_no_prefix.csv"
 
-os.makedirs(DEST_DIR, exist_ok=True)
+def load_keys_from_csv(csv_path):
+    keys = []
+    with open(csv_path, "r", encoding="utf-8", errors="ignore") as f:
+        reader = csv.reader(f)
+        for row in reader:
+            if not row:
+                continue
+            key = row[0].strip()
+            if key:
+                keys.append(key)
+    return keys
 
-for root, dirs, files in os.walk(SOURCE_DIR):
-    for name in files:
-        if not name.lower().endswith(".txt"):
-            continue  # only text files
+def main():
+    keys = load_keys_from_csv(KEYS_CSV)
 
-        file_path = os.path.join(root, name)
+    # Prebuild regex patterns for exact key (no prefix)
+    patterns = {key: re.compile(re.escape(key)) for key in keys}
 
-        try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                # read in chunks to handle large files
-                found = False
-                while True:
-                    chunk = f.read(1024 * 1024)  # 1 MB
-                    if not chunk:
-                        break
-                    if KEY in chunk:
-                        found = True
-                        break
-        except Exception as e:
-            print(f"Error reading {file_path}: {e}")
-            continue
+    # Stats per key
+    stats = {
+        key: {"found": False, "files": set(), "lines": 0}
+        for key in keys
+    }
 
-        if found:
-            dest_path = os.path.join(DEST_DIR, name)
-            shutil.copy2(file_path, dest_path)
-            print(f"Copied (key found): {file_path} -> {dest_path}")
+    # Search and write matching lines
+    with open(OUT_MATCHES, "w", encoding="utf-8", errors="ignore") as out_f:
+        out_f.write("filename\tkey\tline
+")
+
+        for root, dirs, files in os.walk(SOURCE_DIR):
+            for name in files:
+                if not name.lower().endswith(".txt"):
+                    continue
+
+                file_path = os.path.join(root, name)
+
+                try:
+                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                        for line in f:
+                            stripped = line.rstrip("
+")
+                            for key, patt in patterns.items():
+                                if patt.search(stripped):
+                                    out_f.write(f"{file_path}\t{key}\t{stripped}
+")
+                                    stats[key]["found"] = True
+                                    stats[key]["files"].add(file_path)
+                                    stats[key]["lines"] += 1
+                except Exception as e:
+                    print(f"Error reading {file_path}: {e}")
+
+    # Write log
+    with open(LOG_CSV, "w", newline="", encoding="utf-8") as log_f:
+        writer = csv.writer(log_f)
+        writer.writerow(["key", "found", "files_count", "lines_count"])
+        for key, info in stats.items():
+            writer.writerow([
+                key,
+                "YES" if info["found"] else "NO",
+                len(info["files"]),
+                info["lines"]
+            ])
+
+if __name__ == "__main__":
+    main()
