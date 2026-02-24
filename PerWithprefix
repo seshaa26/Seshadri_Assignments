@@ -5,8 +5,9 @@ import shutil
 SOURCE_DIR = r"D:input_folder"
 DEST_DIR   = r"D:output_folder_with_prefix"
 
-# regex: one or more alphanumeric chars, then exactly 16 digits
-pattern = re.compile(r"[A-Za-z0-9]+d{16}")
+KEY = "1234567890123456"    # <-- your 16-digit key
+# one or more alphanumeric chars, then the specific key
+pattern = re.compile(r"[A-Za-z0-9]+" + re.escape(KEY))
 
 os.makedirs(DEST_DIR, exist_ok=True)
 
@@ -21,10 +22,9 @@ for root, dirs, files in os.walk(SOURCE_DIR):
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 found = False
                 while True:
-                    chunk = f.read(1024 * 1024)  # 1 MB
+                    chunk = f.read(1024 * 1024)
                     if not chunk:
                         break
-
                     if pattern.search(chunk):
                         found = True
                         break
@@ -35,4 +35,4 @@ for root, dirs, files in os.walk(SOURCE_DIR):
         if found:
             dest_path = os.path.join(DEST_DIR, name)
             shutil.copy2(file_path, dest_path)
-            print(f"Copied (alnum prefix + 16-digit key found): {file_path} -> {dest_path}")
+            print(f"Copied (prefixed key found): {file_path} -> {dest_path}")
