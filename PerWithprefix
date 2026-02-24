@@ -1,0 +1,38 @@
+import os
+import re
+import shutil
+
+SOURCE_DIR = r"D:input_folder"      # folder with ~300 text files
+DEST_DIR   = r"D:output_folder2"    # another folder (or same) for matches
+PREFIX     = "ABC"                   # required prefix before the 16-digit key
+
+# regex: PREFIX followed by exactly 16 digits
+pattern = re.compile(re.escape(PREFIX) + r"d{16}")
+
+os.makedirs(DEST_DIR, exist_ok=True)
+
+for root, dirs, files in os.walk(SOURCE_DIR):
+    for name in files:
+        if not name.lower().endswith(".txt"):
+            continue  # only text files
+
+        file_path = os.path.join(root, name)
+
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                found = False
+                while True:
+                    chunk = f.read(1024 * 1024)  # 1 MB
+                    if not chunk:
+                        break
+                    if pattern.search(chunk):
+                        found = True
+                        break
+        except Exception as e:
+            print(f"Error reading {file_path}: {e}")
+            continue
+
+        if found:
+            dest_path = os.path.join(DEST_DIR, name)
+            shutil.copy2(file_path, dest_path)
+            print(f"Copied (prefixed key found): {file_path} -> {dest_path}")
