@@ -3,12 +3,13 @@ import csv
 import re
 
 # ====== CONFIGURE THESE PATHS ======
-SOURCE_DIR   = r"D:input_folder"              # folder containing .txt files
-KEYS_CSV     = r"D:keys.csv"                  # CSV with keys (first column)
-OUT_MATCHES  = r"D:matches_with_prefix.txt"   # lines where prefix+key appears
-LOG_CSV      = r"D:log_with_prefix.csv"       # per-key summary
-# ===================================
 
+SOURCE_DIR = r'\\resNP.sysNP.shared.fortis\Files\C\Global\_ApplicationData\MTS-PXRS\se-xf-traceability\Monitoring\KAFKA'
+MTS_refcsv = './MTSref.csv'
+OUT_MATCHES = './feed.txt'
+LOG_CSV = './logs/logs.csv'
+
+# ===================================
 
 def load_keys_from_csv(csv_path):
     keys = []
@@ -22,10 +23,9 @@ def load_keys_from_csv(csv_path):
                 keys.append(key)
     return keys
 
-
 def main():
     # Load keys
-    keys = load_keys_from_csv(KEYS_CSV)
+    keys = load_keys_from_csv(MTS_refcsv)
     if not keys:
         print("No keys loaded from CSV; please check keys.csv.")
         return
@@ -42,11 +42,8 @@ def main():
         for key in keys
     }
 
-    # Search and write matching lines
+    # Search and write matching lines (without filename and key)
     with open(OUT_MATCHES, "w", encoding="utf-8", errors="ignore") as out_f:
-        out_f.write("filename\tkey\tline
-")
-
         for root, _, files in os.walk(SOURCE_DIR):
             for name in files:
                 if not name.lower().endswith(".txt"):
@@ -57,12 +54,10 @@ def main():
                 try:
                     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                         for line in f:
-                            stripped = line.rstrip("
-")
+                            stripped = line.rstrip("")
                             for key, patt in patterns.items():
                                 if patt.search(stripped):
-                                    out_f.write(f"{file_path}\t{key}\t{stripped}
-")
+                                    out_f.write(f"{stripped}\n")  # Only write the matching line
                                     stats[key]["found"] = True
                                     stats[key]["files"].add(file_path)
                                     stats[key]["lines"] += 1
@@ -80,7 +75,6 @@ def main():
                 len(info["files"]),
                 info["lines"],
             ])
-
 
 if __name__ == "__main__":
     main()
