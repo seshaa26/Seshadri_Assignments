@@ -1,0 +1,83 @@
+import os
+import csv
+import re
+
+# ====== CONFIGURE THESE PATHS ======
+SOURCE_DIR   = r"D:input_folder"          # folder containing .txt files
+KEYS_CSV     = r"D:keys.csv"              # CSV with keys (first column)
+OUT_MATCHES  = r"D:matches_no_prefix.txt" # lines where key appears
+LOG_CSV      = r"D:log_no_prefix.csv"     # per-key summary
+# ===================================
+
+
+def load_keys_from_csv(csv_path):
+    keys = []
+    with open(csv_path, "r", encoding="utf-8", errors="ignore", newline="") as f:
+        reader = csv.reader(f)
+        for row in reader:
+            if not row:
+                continue
+            key = row[0].strip()
+            if key:
+                keys.append(key)
+    return keys
+
+
+def main():
+    # Load keys
+    keys = load_keys_from_csv(KEYS_CSV)
+    if not keys:
+        print("No keys loaded from CSV; please check keys.csv.")
+        return
+
+    # Prebuild regex patterns for exact key (no prefix)
+    patterns = {key: re.compile(re.escape(key)) for key in keys}
+
+    # Stats per key
+    stats = {
+        key: {"found": False, "files": set(), "lines": 0}
+        for key in keys
+    }
+
+    # Search and write matching lines
+    with open(OUT_MATCHES, "w", encoding="utf-8", errors="ignore") as out_f:
+        out_f.write("filename\tkey\tline
+")
+
+        for root, _, files in os.walk(SOURCE_DIR):
+            for name in files:
+                if not name.lower().endswith(".txt"):
+                    continue
+
+                file_path = os.path.join(root, name)
+
+                try:
+                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                        for line in f:
+                            stripped = line.rstrip("
+")
+                            for key, patt in patterns.items():
+                                if patt.search(stripped):
+                                    out_f.write(f"{file_path}\t{key}\t{stripped}
+")
+                                    stats[key]["found"] = True
+                                    stats[key]["files"].add(file_path)
+                                    stats[key]["lines"] += 1
+                except Exception as e:
+                    print(f"Error reading {file_path}: {e}")
+
+    # Write log CSV
+    with open(LOG_CSV, "w", newline="", encoding="utf-8") as log_f:
+        writer = csv.writer(log_f)
+        writer.writerow(["key", "found", "files_count", "lines_count"])
+        for key, info in stats.items():
+            writer.writerow([
+                key,
+                "YES" if info["found"] else "NO",
+                len(info["files"]),
+                info["lines"],
+            ])
+
+
+if __name__ == "__main__":
+    main()
