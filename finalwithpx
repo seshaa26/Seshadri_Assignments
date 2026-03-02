@@ -24,7 +24,7 @@ def load_keys_from_csv(csv_path):
     return keys
 
 def main():
-    keys = load_keys_from_csv(KEYS_CSV)
+    keys = load_keys_from_csv(MTS_refcsv)
     if not keys:
         print("No keys loaded from CSV; please check keys.csv.")
         return
