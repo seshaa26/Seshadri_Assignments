@@ -3,10 +3,12 @@ import csv
 import re
 
 # ====== CONFIGURE THESE PATHS ======
-SOURCE_DIR   = r"D:input_folder"
-KEYS_CSV     = r"D:keys.csv"
-OUT_MATCHES  = r"D:matches_no_prefix.txt"
-LOG_CSV      = r"D:log_no_prefix.csv"
+
+SOURCE_DIR = r'\\resNP.sysNP.shared.fortis\Files\C\Global\_ApplicationData\MTS-PXRS\se-xf-traceability\Monitoring\KAFKA'
+MTS_refcsv = './MTSref.csv'
+OUT_MATCHES = r"C:\Users\f30643\AppData\Local\Programs\Python\Python310\feed.txt"
+LOG_CSV = './logs/logs.csv'
+
 # ===================================
 
 def load_keys_from_csv(csv_path):
@@ -22,7 +24,7 @@ def load_keys_from_csv(csv_path):
     return keys
 
 def main():
-    keys = load_keys_from_csv(KEYS_CSV)
+    keys = load_keys_from_csv(MTS_refcsv)
     if not keys:
         print("No keys loaded from CSV; please check keys.csv.")
         return
@@ -38,8 +40,7 @@ def main():
 
     # Search and write matching lines (PRESERVE exact source format)
     with open(OUT_MATCHES, "w", encoding="utf-8", errors="ignore") as out_f:
-        out_f.write("filename\tkey\tline
-")
+        out_f.write("filename\tkey\tline\n")
         
         for root, _, files in os.walk(SOURCE_DIR):
             for name in files:
@@ -51,13 +52,11 @@ def main():
                 try:
                     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                         for line_num, line in enumerate(f, 1):
-                            # line includes trailing 
- from source file
+                            # line includes trailing from source file
                             for key, patt in patterns.items():
                                 if patt.search(line):
                                     # Write: filename\tkey\tORIGINAL LINE EXACTLY AS SOURCE
-                                    out_f.write(f"{file_path}\t{key}\t{line.rstrip()}
-")
+                                    out_f.write(f"{file_path}\t{key}\t{line.rstrip()}")
                                     stats[key]["found"] = True
                                     stats[key]["files"].add(file_path)
                                     stats[key]["lines"] += 1
