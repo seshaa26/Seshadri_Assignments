@@ -2,14 +2,10 @@ import os
 import csv
 import re
 
-# ====== CONFIGURE THESE PATHS ======
-
-SOURCE_DIR = r'\\resNP.sysNP.shared.fortis\Files\C\Global\_ApplicationData\MTS-PXRS\se-xf-traceability\Monitoring\KAFKA'
-MTS_refcsv = './MTSref.csv'
-OUT_MATCHES = r"C:\Users\f30643\AppData\Local\Programs\Python\Python310\feed.txt"
-LOG_CSV = './logs/logs.csv'
-
-# ===================================
+SOURCE_DIR   = r"D:input_folder"
+KEYS_CSV     = r"D:keys.csv"
+OUT_MATCHES  = r"D:matches_no_prefix.txt"
+LOG_CSV      = r"D:log_no_prefix.csv"
 
 def load_keys_from_csv(csv_path):
     keys = []
@@ -24,24 +20,20 @@ def load_keys_from_csv(csv_path):
     return keys
 
 def main():
-    keys = load_keys_from_csv(MTS_refcsv)
+    keys = load_keys_from_csv(KEYS_CSV)
     if not keys:
         print("No keys loaded from CSV; please check keys.csv.")
         return
 
-    # Prebuild regex patterns for exact key
     patterns = {key: re.compile(re.escape(key)) for key in keys}
 
-    # Stats per key
     stats = {
         key: {"found": False, "files": set(), "lines": 0}
         for key in keys
     }
 
-    # Search and write matching lines (PRESERVE exact source format)
     with open(OUT_MATCHES, "w", encoding="utf-8", errors="ignore") as out_f:
-        out_f.write("filename\tkey\tline\n")
-        
+        # no header, only matching lines
         for root, _, files in os.walk(SOURCE_DIR):
             for name in files:
                 if not name.lower().endswith(".txt"):
@@ -51,20 +43,18 @@ def main():
 
                 try:
                     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                        for line_num, line in enumerate(f, 1):
-                            # line includes trailing from source file
+                        for line in f:
+                            # preserve line exactly as in source
                             for key, patt in patterns.items():
                                 if patt.search(line):
-                                    # Write: filename\tkey\tORIGINAL LINE EXACTLY AS SOURCE
-                                    out_f.write(f"{file_path}\t{key}\t{line.rstrip()}")
+                                    out_f.write(line)
                                     stats[key]["found"] = True
                                     stats[key]["files"].add(file_path)
                                     stats[key]["lines"] += 1
-                                    break  # one key per line (optimize)
+                                    break
                 except Exception as e:
                     print(f"Error reading {file_path}: {e}")
 
-    # Write log CSV
     with open(LOG_CSV, "w", newline="", encoding="utf-8") as log_f:
         writer = csv.writer(log_f)
         writer.writerow(["key", "found", "files_count", "lines_count"])
@@ -75,8 +65,6 @@ def main():
                 len(info["files"]),
                 info["lines"],
             ])
-    
-    print(f"Search complete. Matches: {OUT_MATCHES}, Log: {LOG_CSV}")
 
 if __name__ == "__main__":
     main()
