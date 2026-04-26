@@ -42,3 +42,88 @@ Sub ExportColumnsToTxt()
     
     MsgBox "Export complete. Files saved in " & folderPath
 End Sub
+
+
+
+Sub ExportColumnsToTxt_WithWait()
+    Dim ws As Worksheet
+    Dim fso As Object
+    Dim txtFile As Object
+    Dim folderPath As String
+    Dim fileName As String
+    Dim timeStamp As String
+    Dim lastRow As Long, lastCol As Long
+    Dim colNum As Long
+    Dim dataArray As Variant
+    Dim i As Long
+
+    ' 1. Optimization: Improve execution speed (outside of the forced wait)
+    Application.ScreenUpdating = False
+    On Error GoTo ErrorHandler
+
+    ' 2. Configuration
+    ' Change this path to your specific folder
+    folderPath = "C:\Users\YourName\Documents\XIP\"
+    
+    ' Ensure path ends with backslash
+    If Right(folderPath, 1) <> "\" Then folderPath = folderPath & "\"
+
+    ' Create FileSystemObject once
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    ' Create folder if it doesn't exist
+    If Not fso.FolderExists(folderPath) Then
+        fso.CreateFolder (folderPath)
+    End If
+
+    Set ws = ThisWorkbook.Sheets(1) ' Set to your specific sheet
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+
+    ' 3. Loop through each column
+    For colNum = 1 To lastCol
+        
+        ' --- THE WAIT STATEMENT ---
+        ' This pauses the code for exactly 1 second before processing each column
+        Application.Wait (Now + TimeValue("00:00:01"))
+        
+        lastRow = ws.Cells(ws.Rows.Count, colNum).End(xlUp).Row
+        
+        ' Skip column if it's completely empty
+        If lastRow >= 1 And ws.Cells(1, colNum).Value <> "" Then
+            
+            ' Generate unique timestamp (now reflects the time AFTER the wait)
+            timeStamp = Format(Now, "yyyymmdd_HHMMss")
+            
+            ' Build filename
+            fileName = folderPath & "pain001V9_Col" & colNum & "_" & timeStamp & ".txt"
+
+            ' Load column data into an array for faster processing
+            dataArray = ws.Range(ws.Cells(1, colNum), ws.Cells(lastRow, colNum)).Value
+            
+            ' Create and write to the text file
+            Set txtFile = fso.CreateTextFile(fileName, True)
+            
+            ' Check if dataArray is a 2D array (more than 1 cell) or a single value
+            If IsArray(dataArray) Then
+                For i = 1 To UBound(dataArray, 1)
+                    txtFile.WriteLine CStr(dataArray(i, 1))
+                Next i
+            Else
+                txtFile.WriteLine CStr(dataArray)
+            End If
+            
+            txtFile.Close
+        End If
+    Next colNum
+
+    ' 4. Cleanup and Notification
+    Application.ScreenUpdating = True
+    MsgBox "Export complete!" & vbCrLf & _
+           "Total columns processed: " & lastCol & vbCrLf & _
+           "Files saved in: " & folderPath, vbInformation
+    Exit Sub
+
+ErrorHandler:
+    Application.ScreenUpdating = True
+    MsgBox "An error occurred: " & Err.Description, vbCritical
+End Sub
