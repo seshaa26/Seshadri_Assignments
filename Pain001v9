@@ -1,0 +1,44 @@
+Sub ExportColumnsToTxt()
+    Dim ws As Worksheet
+    Dim col As Range
+    Dim cell As Range
+    Dim fso As Object
+    Dim txtFile As Object
+    Dim folderPath As String
+    Dim fileName As String
+    Dim timeStamp As String
+    Dim lastRow As Long
+    Dim colNum As Long
+    
+    ' Set your desired folder path here
+    folderPath = "C:\Users\YourName\Documents\XIP\"
+    
+    ' Ensure folder path ends with "\"
+    If Right(folderPath, 1) <> "\" Then folderPath = folderPath & "\"
+    
+    Set ws = ThisWorkbook.Sheets(1) ' Change to your sheet
+    
+    ' Loop through each column with data
+    For colNum = 1 To ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+        lastRow = ws.Cells(ws.Rows.Count, colNum).End(xlUp).Row
+        
+        ' Generate timestamp with milliseconds
+        timeStamp = Format(Now, "yyyymmdd_HHMMss") & "_" & Format(Timer Mod 1, "000")
+        
+        ' Build filename
+        fileName = folderPath & "pain001V9_" & timeStamp & ".txt"
+        
+        ' Create FileSystemObject
+        Set fso = CreateObject("Scripting.FileSystemObject")
+        Set txtFile = fso.CreateTextFile(fileName, True)
+        
+        ' Write each cell in column to file
+        For Each cell In ws.Range(ws.Cells(1, colNum), ws.Cells(lastRow, colNum))
+            txtFile.WriteLine CStr(cell.Value)
+        Next cell
+        
+        txtFile.Close
+    Next colNum
+    
+    MsgBox "Export complete. Files saved in " & folderPath
+End Sub
