@@ -127,3 +127,106 @@ ErrorHandler:
     Application.ScreenUpdating = True
     MsgBox "An error occurred: " & Err.Description, vbCritical
 End Sub
+
+
+claude
+
+Sub ExportColumnsToTxt_WithWait()
+    Dim ws As Worksheet
+    Dim fso As Object
+    Dim txtFile As Object
+    Dim folderPath As String
+    Dim fileName As String
+    Dim timeStamp As String
+    Dim lastRow As Long, lastCol As Long
+    Dim colNum As Long
+    Dim dataArray As Variant
+    Dim i As Long
+
+    ' 1. Optimization: Improve execution speed (outside of the forced wait)
+    Application.ScreenUpdating = False
+    On Error GoTo ErrorHandler
+
+    ' 2. Configuration
+    ' Change this path to your specific folder
+    folderPath = "C:\Users\YourName\Documents\XIP\"
+
+    ' Ensure path ends with backslash
+    If Right(folderPath, 1) <> "\" Then folderPath = folderPath & "\"
+
+    ' Create FileSystemObject once
+    Set fso = CreateObject("Scripting.FileSystemObject")
+
+    ' Create folder if it doesn't exist
+    If Not fso.FolderExists(folderPath) Then
+        fso.CreateFolder folderPath   ' Fix #5: Removed unnecessary parentheses
+    End If
+
+    Set ws = ThisWorkbook.Sheets(1)   ' Set to your specific sheet
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+
+    ' 3. Loop through each column
+    For colNum = 1 To lastCol
+
+        ' --- THE WAIT STATEMENT ---
+        ' This pauses the code for exactly 1 second before processing each column
+        Application.Wait Now + TimeValue("00:00:01")   ' Fix #5: Removed unnecessary parentheses
+
+        lastRow = ws.Cells(ws.Rows.Count, colNum).End(xlUp).Row
+
+        ' Fix #3: Removed redundant lastRow >= 1 check (End(xlUp).Row always returns at least 1)
+        If ws.Cells(1, colNum).Value <> "" Then
+
+            ' Fix #1: Changed "MM" to "nn" for correct Minutes in timestamp
+            timeStamp = Format(Now, "yyyymmdd_HHnnss")
+
+            ' Build filename
+            fileName = folderPath & "pain001V9_Col" & colNum & "_" & timeStamp & ".txt"
+
+            ' Load column data into an array for faster processing
+            dataArray = ws.Range(ws.Cells(1, colNum), ws.Cells(lastRow, colNum)).Value
+
+            ' Create and write to the text file
+            Set txtFile = fso.CreateTextFile(fileName, True)
+
+            ' Check if dataArray is a 2D array (more than 1 cell) or a single value
+            If IsArray(dataArray) Then
+                For i = 1 To UBound(dataArray, 1)
+                    txtFile.WriteLine CStr(dataArray(i, 1))
+                Next i
+            Else
+                txtFile.WriteLine CStr(dataArray)
+            End If
+
+            txtFile.Close
+            Set txtFile = Nothing   ' Fix #4: Release txtFile after each use
+        End If
+
+    Next colNum
+
+    ' 4. Cleanup and Notification
+    ' Fix #4: Release all objects before exit
+    Set fso = Nothing
+    Set ws = Nothing
+
+    Application.ScreenUpdating = True
+    MsgBox "Export complete!" & vbCrLf & _
+           "Total columns processed: " & lastCol & vbCrLf & _
+           "Files saved in: " & folderPath, vbInformation
+    Exit Sub
+
+ErrorHandler:
+    Application.ScreenUpdating = True
+    ' Fix #2: Safely close txtFile if it was left open during an error
+    If Not txtFile Is Nothing Then
+        On Error Resume Next
+        txtFile.Close
+        On Error GoTo 0
+    End If
+    ' Fix #4: Release all objects on error too
+    Set txtFile = Nothing
+    Set fso = Nothing
+    Set ws = Nothing
+    MsgBox "An error occurred: " & Err.Description, vbCritical
+
+End Sub
