@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RequestPayload xmlns="urn:swift:pkg:xsd:swift.payevp.01">
+    <AppHdr xmlns="urn:iso:std:iso:20022:tech:xsd:head.001.001.01">
+        <Fr>
+            <FIId>
+                <FinInstnId>
+                    <BICFI>BNPAJPJTXXX</BICFI>
+                </FinInstnId>
+            </FIId>
+        </Fr>
+        <To>
+            <FIId>
+                <FinInstnId>
+                    <BICFI>BNPAFRPPXXX</BICFI>
+                </FinInstnId>
+            </FIId>
+        </To>
+        <BizMsgIdr>BNPJAP20260505REF001</BizMsgIdr>
+        <MsgDefIdr>pacs.008.001.08</MsgDefIdr>
+        <BizSvc>swift.cbprplus.02</BizSvc>
+        <CreDt>2026-05-05T06:43:00Z</CreDt>
+    </AppHdr>
+
+    <Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08">
+        <FIToFICstmrCdtTrf>
+            <GrpHdr>
+                <MsgId>MSG-BNP-20260505-01</MsgId>
+                <CreDtTm>2026-05-05T06:43:00Z</CreDtTm>
+                <NbOfTxs>1</NbOfTxs>
+                <SttlmInf>
+                    <Mtd>INGA</Mtd>
+                    <SttlmAcct>
+                        <Id>
+                            <IBAN>FR7630004000011234567890123</IBAN>
+                        </Id>
+                    </SttlmAcct>
+                </SttlmInf>
+            </GrpHdr>
+            <CdtTrfTxInf>
+                <PmtId>
+                    <InstrId>INSTR-001</InstrId>
+                    <EndToEndId>E2E-REF-BNP-8899</EndToEndId>
+                    <TxId>TXN-BNP-8899</TxId>
+                    <UETR>550e8400-e29b-41d4-a716-446655440000</UETR>
+                </PmtId>
+                <PmtTpInf>
+                    <SvcLvl>
+                        <Cd>URGP</Cd>
+                    </SvcLvl>
+                </PmtTpInf>
+                <IntrBkSttlmAmt Ccy="EUR">12500.00</IntrBkSttlmAmt>
+                <IntrBkSttlmDt>2026-05-05</IntrBkSttlmDt>
+                <ChrgBr>SLEV</ChrgBr>
+                <InstgAgt>
+                    <FinInstnId>
+                        <BICFI>BNPAJPJTXXX</BICFI>
+                    </FinInstnId>
+                </InstgAgt>
+                <InstdAgt>
+                    <FinInstnId>
+                        <BICFI>BNPAFRPPXXX</BICFI>
+                    </FinInstnId>
+                </InstdAgt>
+                <Dbtr>
+                    <Nm>Tokyo Components Co.</Nm>
+                    <PstlAdr>
+                        <Ctry>JP</Ctry>
+                        <AdrLine>1-1-1 Shibaura, Tokyo</AdrLine>
+                    </PstlAdr>
+                </Dbtr>
+                <DbtrAcct>
+                    <Id>
+                        <Othr>
+                            <Id>7766554433</Id>
+                        </Othr>
+                    </Id>
+                </DbtrAcct>
+                <DbtrAgt>
+                    <FinInstnId>
+                        <BICFI>BNPAJPJTXXX</BICFI>
+                    </FinInstnId>
+                </DbtrAgt>
+                <CdtrAgt>
+                    <FinInstnId>
+                        <BICFI>BNPAFRPPXXX</BICFI>
+                    </FinInstnId>
+                </CdtrAgt>
+                <Cdtr>
+                    <Nm>Lyon Logistics SAS</Nm>
+                    <PstlAdr>
+                        <Ctry>FR</Ctry>
+                        <AdrLine>22 Rue de la République, Lyon</AdrLine>
+                    </PstlAdr>
+                </Cdtr>
+                <CdtrAcct>
+                    <Id>
+                        <IBAN>FR7630002000055667788990011</IBAN>
+                    </Id>
+                </CdtrAcct>
+                <Purp>
+                    <Cd>GDDS</Cd>
+                </Purp>
+                <RmtInf>
+                    <Ustrd>INV-2026-MAY-001</Ustrd>
+                </RmtInf>
+            </CdtTrfTxInf>
+        </FIToFICstmrCdtTrf>
+    </Document>
+</RequestPayload>
+
