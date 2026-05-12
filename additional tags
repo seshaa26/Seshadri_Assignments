@@ -8,3 +8,4 @@ CdtTrfTxInf/RgltryRptg/Dtls/Inf - 5 instances
 PmtInf/CdtTrfTxInf/Amt/EqvtAmt - 1 instance
 PmtInf/CdtTrfTxInf/CdtrAgt/FinInstnId/ClrSysMmbId/ClrSysId/Cd  - 1 instance
 PmtInf/CdtTrfTxInf/CdtrAgt/FinInstnId/ClrSysMmbId/MmbId   - 1 instance
+CstmrCdtTrfInitn/PmtInf/CdtTrfTxInf/Purp - 1 instance
