@@ -75,6 +75,9 @@ Attribute VB_Name = "ExportPain1V9_Improved"
 '  BG    INPUT  RmtInf/Strd line 3
 '  BH    INPUT  RmtInf/Strd line 4
 '  BI    INPUT  RmtInf/Strd line 5
+'  BJ    INPUT  CdtTrfTxInf/Purp/Cd    (ExternalPurpose1Code, max 4 chars;
+'               XSD choice: Cd OR Prtry – Cd takes priority; skip if both empty)
+'  BK    INPUT  CdtTrfTxInf/Purp/Prtry (Max35Text; used only when BJ is empty)
 ' ==============================================================================
 
 Option Explicit
@@ -521,6 +524,29 @@ Sub ExportPain1V9()
         Next i
 
         ' =====================================================================
+        ' Purp (Purpose)  →  col BJ (Cd) / col BK (Prtry)  →  work col AS-1*
+        ' XSD: Purpose2Choice – CHOICE: Cd (ExternalPurpose1Code) OR Prtry (Max35Text)
+        '   Cd takes priority; if Cd empty and Prtry populated → use Prtry.
+        '   If both empty → suppress <Purp> entirely.
+        ' Input cols: BJ = Cd,  BK = Prtry
+        ' Work col  : the fragment is written to col BJ (overwritten with XML)
+        ' =====================================================================
+        For i = 2 To lastRow
+            Dim purpCd    As String
+            Dim purpPrtry As String
+            purpCd    = CellStr(ws, i, "BJ")
+            purpPrtry = CellStr(ws, i, "BK")
+
+            If Len(purpCd) > 0 Then
+                .Range("BJ" & i).Value = "<Purp><Cd>" & purpCd & "</Cd></Purp>"
+            ElseIf Len(purpPrtry) > 0 Then
+                .Range("BJ" & i).Value = "<Purp><Prtry>" & purpPrtry & "</Prtry></Purp>"
+            Else
+                .Range("BJ" & i).Value = ""   ' suppress – both inputs empty
+            End If
+        Next i
+
+        ' =====================================================================
         ' RegulatoryReporting  →  cols AJ, AK, AL, AV, AW  (Inf lines 1-5)
         '                          col  AU  (Dtls/Cd)
         '                          col  AR  (closing tag)
@@ -671,7 +697,7 @@ Sub ExportPain1V9()
         ' =====================================================================
         columnsToConcatenate = Array("G", "H", "I", "J", "L", "M", "N", "P", "Q", _
                                      "S", "U", "V", "X", "Z", "AC", "AE", "AF", "AI", _
-                                     "AJ", "AR", "AM", "AQ")
+                                     "BJ", "AJ", "AR", "AM", "AQ")
 
         ' Build IPAS header string once from row 2 work cols G, H, I
         Dim ipasHeader As String
@@ -726,6 +752,7 @@ NextRow:
         .Range("AB2:AC5000").ClearContents
         .Range("AE2:AF5000").ClearContents
         .Range("AI2:AS5000").ClearContents
+        .Range("BJ2:BJ5000").ClearContents   ' Purp work column
 
     End With
 
