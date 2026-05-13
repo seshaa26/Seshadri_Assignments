@@ -75,7 +75,7 @@ Attribute VB_Name = "ExportPain1V9_XSDOrder"
 '  +------+-------------------------------------------------------------------+
 '  |  AI  | Bouchons suppress flag   non-empty = suppress simulation tags    |
 '  |  AJ  | RmtInf / Ustrd  user text line 1  (combined with MISTRAL)        |
-'  |  AK  | RmtInf / Ustrd  user text line 2                                 |
+'  |  AK  | free                                 |
 '  |  AL  | RmtInf / Strd / AddtlRmtInf  line 1   Max140Text                 |
 '  |  AM  | RmtInf / Strd / AddtlRmtInf  line 2                              |
 '  |  AN  | RmtInf / Strd / AddtlRmtInf  line 3                              |
@@ -644,8 +644,9 @@ Sub ExportPain1V9()
         '
         ' WARNING: Ustrd combined length must not exceed 140 chars.
         ' ======================================================================
-        For i = 2 To lastRow
 
+        For i = 2 To lastRow
+			
             ' Build MISTRAL reference
             randomNumber  = ""
             randomNumber1 = ""
@@ -657,25 +658,37 @@ Sub ExportPain1V9()
                 mi2 = Chr(Int(26 * Rnd + 65))
                 mi3 = Chr(Int(26 * Rnd + 65))
             Next j
+			
+			If Len(CellStr(ws, i, "C")) > 0 Then
+                channel = CellStr(ws, i, "C")
+            Else
+                channel = "SFA"
+            End If
+			
             mistralContent = "/MISTRAL_SO//" & mi1 & mi2 & mi3 & headerdt1 & randomNumber & _
                              "//BULK//" & mi3 & mi1 & mi2 & headerdt1 & _
-                             CStr(randomDigit) & randomNumber1 & "//CHAN//SFA/"
+                             CStr(randomDigit) & randomNumber1 & "//CHAN//" & channel & "/"
 
             ' Bouchons (simulation markers)
             If Len(CellStr(ws, i, "AI")) = 0 Then
-                bouchonsContent = "/SIMUL_FBK//AUTH/OK/AMI000/E0//SIMUL_FBK//BOOK/OK/AMI000/"
+                bouchonsContent = "<InstrForCdtrAgt><InstrInf>SIMUL_FBK//AUTH/OK/AMI000/E0//SIMUL_FBK//BOOK/OK/AMI000/</InstrInf></InstrForCdtrAgt>"
             Else
                 bouchonsContent = ""
             End If
 
-            ' User free-text remittance (cols AJ, AK)
-            rm1 = CellStr(ws, i, "AJ")
-            rm2 = CellStr(ws, i, "AK")
-
+            ' User free-text remittance (cols AJ)
+			
+			If Len(CellStr(ws, i, "AJ")) > 0 Then
+                rm1 = "<Ustrd>" & CellStr(ws, i, "AJ") & "</Ustrd>"
+            Else
+                rm1 = ""
+            End If
+			            
             ' Combine into single Ustrd (max 140 chars, max 1 occurrence)
-            ustrdContent = mistralContent & bouchonsContent & rm1 & rm2
+            ustrdContent = mistralContent
             Dim ustrdBlock As String
-            ustrdBlock = "<Ustrd>" & ustrdContent & "</Ustrd>"
+            ustrdBlock = "<Ustrd>" & mistralContent & "</Ustrd>" & rm1		
+						
 
             ' Structured remittance - AddtlRmtInf lines (cols AL-AP)
             Dim s1 As String, s2 As String, s3 As String, s4 As String, s5 As String
@@ -756,7 +769,7 @@ Sub ExportPain1V9()
             Print #fileNum, columnData
             Close #fileNum
 
-            Sleep 500   ' 0.5 s between files
+            Sleep 400   ' 0.4 s between files
 
 NextRow:
         Next i
@@ -772,6 +785,6 @@ NextRow:
     End With
 
     MsgBox "Export complete: " & (lastRow - 1) & " file(s) written to " & Path, _
-           vbInformation, "pain.001.001.09 Export"
+           vbInformation, "pain.001.001.09 Exported"
 
 End Sub
