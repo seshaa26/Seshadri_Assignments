@@ -1,0 +1,127 @@
+IF01IPASGCH             PAIN001 PHZZ1KFD9PP3KMXWPO9                       20260508130509INPUT                                   000000010000000000000000000000000000                    00000000                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.09">
+	<CstmrCdtTrfInitn>
+		<GrpHdr>
+			<MsgId>0000014624</MsgId>
+			<CreDtTm>2026-05-08T13:05:09</CreDtTm>
+			<NbOfTxs>2</NbOfTxs>
+			<CtrlSum>3.12</CtrlSum>
+			<InitgPty>
+				<Nm>IODDINIS</Nm>
+			</InitgPty>
+		</GrpHdr>
+		<PmtInf>
+			<PmtInfId>CD08000001</PmtInfId>
+			<PmtMtd>TRF</PmtMtd>
+			<BtchBookg>true</BtchBookg>
+			<NbOfTxs>2</NbOfTxs>
+			<CtrlSum>3.12</CtrlSum>
+			<PmtTpInf>
+				<InstrPrty>NORM</InstrPrty>
+			</PmtTpInf>
+			<ReqdExctnDt>
+				<Dt>2026-04-15</Dt>
+			</ReqdExctnDt>
+			<Dbtr>
+				<Nm>KAI QACHRAS</Nm>
+				<PstlAdr>
+					<Ctry>PT</Ctry>
+					<AdrLine>TORRE OCIDENTE RUA GALILEU GALILEI2, FLOOR 13 1500-392 LISBON</AdrLine>
+				</PstlAdr>
+			</Dbtr>
+			<DbtrAcct>
+				<Id>
+					<IBAN>PT50003401091013670014091</IBAN>
+				</Id>
+				<Ccy>USD</Ccy>
+			</DbtrAcct>
+			<DbtrAgt>
+				<FinInstnId>
+					<BICFI>BNPAPTPLXXX</BICFI>
+					<Nm>KAI QACHRAS</Nm>
+					<PstlAdr>
+						<Ctry>PT</Ctry>
+						<AdrLine>TORRE OCIDENTE RUA GALILEU GALILEI 2, FLOOR 13 1500-392 LISBON</AdrLine>
+					</PstlAdr>
+				</FinInstnId>
+			</DbtrAgt>
+			<ChrgBr>SHAR</ChrgBr>
+			<CdtTrfTxInf>
+				<PmtId>
+					<InstrId>CD08000001000001</InstrId>
+					<EndToEndId>Z260508A00608333</EndToEndId>
+				</PmtId>
+				<Amt>
+					<InstdAmt Ccy="USD">1.12</InstdAmt>
+				</Amt>
+				<ChrgBr>SHAR</ChrgBr>
+				<CdtrAgt>
+					<FinInstnId>
+						<BICFI>CITIUS33XXX</BICFI>
+						<Nm>REPENANT N.A.</Nm>
+						<PstlAdr>
+							<PstCd>10013</PstCd>
+							<TwnNm>NEW YORK</TwnNm>
+							<Ctry>US</Ctry>
+							<AdrLine>388 GREENWICH STREET 10013 NEW YORK</AdrLine>
+							<AdrLine>NEW YORK</AdrLine>
+						</PstlAdr>
+					</FinInstnId>
+				</CdtrAgt>
+				<Cdtr>
+					<Nm>tcgl2</Nm>
+					<PstlAdr>
+						<BldgNb>1</BldgNb>
+						<PstCd>6001</PstCd>
+						<TwnNm>town</TwnNm>
+						<Ctry>US</Ctry>
+					</PstlAdr>
+				</Cdtr>
+				<CdtrAcct>
+					<Id>
+						<Othr>
+							<Id>1213141212</Id>
+						</Othr>
+					</Id>
+				</CdtrAcct>
+				<RmtInf>
+					<Ustrd>/MISTRAL_SO//ZZ1KFD9PP7QX2NX4P//BULK//ZZ1KFD9PP3KMXWPO9//CHAN//CNX//PAM_ID//Z260508A00608333/</Ustrd>
+					<Ustrd>check Marne</Ustrd>
+				</RmtInf>
+			</CdtTrfTxInf>
+			<CdtTrfTxInf>
+				<PmtId>
+					<InstrId>CD08000001000002</InstrId>
+					<EndToEndId>Z260508A00608334</EndToEndId>
+				</PmtId>
+				<Amt>
+					<InstdAmt Ccy="USD">2.00</InstdAmt>
+				</Amt>
+				<ChrgBr>SHAR</ChrgBr>
+				<CdtrAgt>
+					<FinInstnId>
+						<BICFI>BOFAUS3NXXX</BICFI>
+					</FinInstnId>
+				</CdtrAgt>
+				<Cdtr>
+					<Nm>tdzls</Nm>
+					<PstlAdr>
+						<Ctry>US</Ctry>
+					</PstlAdr>
+				</Cdtr>
+				<CdtrAcct>
+					<Id>
+						<Othr>
+							<Id>123123123123</Id>
+						</Othr>
+					</Id>
+				</CdtrAcct>
+				<RmtInf>
+					<Ustrd>/MISTRAL_SO//ZZ1KFD9PP8JF3OFI1//BULK//ZZ1KFD9PP3KMXWPO9//CHAN//CNX//PAM_ID//Z260508A00608334/</Ustrd>
+					<Ustrd>c2</Ustrd>
+				</RmtInf>
+			</CdtTrfTxInf>
+		</PmtInf>
+	</CstmrCdtTrfInitn>
+</Document>
