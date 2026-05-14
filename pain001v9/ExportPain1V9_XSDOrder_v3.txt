@@ -123,11 +123,12 @@
 Option Explicit
 
 ' Windows API for millisecond-precision sleep
-'#If VBA7 Then
-'    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As LongPtr)
-'#Else
-'    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
-'#End If
+#If VBA7 Then
+    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+#Else
+    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+#End If
+
 
 ' ------------------------------------------------------------------------------
 ' Helper: safely read a cell as trimmed string
@@ -199,7 +200,7 @@ Sub ExportPain1V9()
     ' Row 1 = header labels; data starts at row 2.
     ' lastRow anchored to col J (Debtor bank code - always required).
     Dim lastRow As Long
-    lastRow = ws.Cells(ws.rows.Count, "J").End(xlUp).row
+    lastRow = ws.Cells(ws.rows.Count, "B").End(xlUp).row
 
     ' --------------------------------------------------------------------------
     ' Date / time stamp
@@ -291,12 +292,9 @@ Sub ExportPain1V9()
             .Range("BP" & i).value = _
                 "T00:00:00</CreDtTm>" & _
                 "<NbOfTxs>1</NbOfTxs>" & _
+                "<CtrlSum>30.00</CtrlSum>" & _
                 "<InitgPty>" & _
-                "<Nm>Paella</Nm>" & _
-                "<PstlAdr><Ctry>ES</Ctry>" & _
-                "<AdrLine>La playa 4</AdrLine>" & _
-                "<AdrLine>Barcelona</AdrLine></PstlAdr>" & _
-                "<CtryOfRes>ES</CtryOfRes>" & _
+                "<Nm>BNP client</Nm>" & _
                 "</InitgPty></GrpHdr><PmtInf>"
 
             ' BV : static Debtor block
@@ -324,7 +322,10 @@ Sub ExportPain1V9()
             .Range("BQ" & i).value = _
                 "<PmtInfId>" & ref & "</PmtInfId>" & _
                 "<PmtMtd>TRF</PmtMtd>" & _
-                "<BtchBookg>false</BtchBookg>"
+                "<BtchBookg>false</BtchBookg>" & _
+                "<NbOfTxs>1</NbOfTxs>" & _
+                "<CtrlSum>30.00</CtrlSum>"
+
         Next i
 
         ' ======================================================================
@@ -521,8 +522,16 @@ Sub ExportPain1V9()
                 finInstnBlock = finInstnBlock & "<BICFI>" & cdtrBicfi & "</BICFI>"
             End If
             finInstnBlock = finInstnBlock & clrSysBlock & "</FinInstnId>"
+            
+            cellValue = CellStr(ws, i, "V")
+            If Len(cellValue) >= 6 Then
+                extracted = Mid(cellValue, 5, 2)
+            Else
+                extracted = ""
+            End If
 
-            .Range("CD" & i).value = finInstnBlock & "</CdtrAgt>" & _
+
+            .Range("CD" & i).value = finInstnBlock & "<PstlAdr><Ctry>" & extracted & "</Ctry></PstlAdr></CdtrAgt>" & _
                 "<Cdtr><Nm>Abigail Gerfried</Nm><PstlAdr>"
         Next i
 
@@ -744,7 +753,7 @@ Sub ExportPain1V9()
             For Each col In xmlCols
                 concatenatedString = concatenatedString & .Cells(i, col).value
             Next col
-            .Range("CL" & i).value = ipasHeader & Chr(10) & concatenatedString
+            .Range("CM" & i).value = ipasHeader & Chr(10) & concatenatedString
         Next i
 
         ' ======================================================================
@@ -757,20 +766,20 @@ Sub ExportPain1V9()
         Dim fileNum As Integer
 
         For i = 2 To lastRow
-            columnData = CellStr(ws, i, "CL")
+            columnData = CellStr(ws, i, "CM")
             If Len(Trim(columnData)) = 0 Then GoTo NextRow
 
             Dim pmtRef As String
             pmtRef = CellStr(ws, i, "B")
             If Len(pmtRef) = 0 Then pmtRef = "userref" & rd1
-            filePath = Path & pmtRef & "_" & Rand4() & "_Pain001v9.txt"
+            filePath = Path & ws.Range("J" & i).value & "_" & pmtRef & "_" & Rand4() & "_Pain001v9.txt"
 
             fileNum = FreeFile
             Open filePath For Output As #fileNum
             Print #fileNum, columnData
             Close #fileNum
 
-            Sleep 400   ' 0.4 s between files
+            Sleep 1400   ' 0.4 s between files
 
 NextRow:
         Next i
@@ -780,13 +789,16 @@ NextRow:
         ' INPUT area  : B2:AP5000
         ' WORK area   : BN2:CL5000
         ' ======================================================================
-        .Range("B2:AP5000").ClearContents
-        .Range("BN2:CL5000").ClearContents
+        '.Range("B2:AP5000").ClearContents
+        .Range("BN2:CM5000").ClearContents
 
     End With
 
-    MsgBox "Export complete: " & (lastRow - 1) & " file(s) written to " & Path, _
-           vbInformation, "pain.001.001.09 Exported"
+    'MsgBox "Export complete: " & (lastRow - 1) & " file(s) written to " & Path, _
+           vbInformation, "file Exported"
+           
+    MsgBox " Export completed "
 
 End Sub
+
 
