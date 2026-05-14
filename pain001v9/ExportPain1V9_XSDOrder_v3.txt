@@ -187,7 +187,7 @@ End Function
 ' ==============================================================================
 ' Main export
 ' ==============================================================================
-Sub ExportPain1V9()
+Sub EEExportPain1V9()
 
     ' --------------------------------------------------------------------------
     ' Worksheet references
@@ -205,11 +205,12 @@ Sub ExportPain1V9()
     ' --------------------------------------------------------------------------
     ' Date / time stamp
     ' --------------------------------------------------------------------------
+        
     Dim dtsnow    As Variant
     Dim dd        As String, mm As String, yy As String, yy2 As String
     Dim hh        As String, nn As String, ss As String
     Dim dateValue As String, headerdt1 As String, headerdt2 As String
-    Dim createdt  As String
+    Dim createdt, milliseconds   As String
 
     dtsnow = Now()
     dd = Right("00" & Day(dtsnow), 2)
@@ -224,6 +225,7 @@ Sub ExportPain1V9()
     headerdt1 = yy2 & mm & dd & hh & nn & ss
     headerdt2 = yy & mm & dd & hh & nn & ss
     createdt = yy & "-" & mm & "-" & dd
+    milliseconds = Timer * 1000 Mod 1000
 
     ' --------------------------------------------------------------------------
     ' Random seed
@@ -242,11 +244,13 @@ Sub ExportPain1V9()
     ' --------------------------------------------------------------------------
     Dim ipasHeader As String
     ipasHeader = "IF01IPASGCH             PAIN001 PHXIPP" & _
-                 headerdt1 & ch & rd1 & Space(20) & headerdt2 & _
+                 headerdt1 & ch & milliseconds & Space(20) & headerdt2 & _
                  "INPUT                                   00000000" & _
                  "                    00000000" & _
                  "                    00000000" & Space(110)
 
+    
+    
     ' --------------------------------------------------------------------------
     ' BIC lookup range  (col J -> BIClist A:B)
     ' --------------------------------------------------------------------------
@@ -317,8 +321,8 @@ Sub ExportPain1V9()
         ' INPUT: col B  (auto-generated if empty)
         ' ======================================================================
         For i = 2 To lastRow
-            ref = CellStr(ws, i, "B")
-            If Len(ref) = 0 Then ref = "userref" & rd1
+            ref = CellStr(ws, i, "B") & rd1 & milliseconds
+            If Len(ref) = 0 Then ref = "userref" & rd1 & milliseconds
             .Range("BQ" & i).value = _
                 "<PmtInfId>" & ref & "</PmtInfId>" & _
                 "<PmtMtd>TRF</PmtMtd>" & _
@@ -754,6 +758,7 @@ Sub ExportPain1V9()
                 concatenatedString = concatenatedString & .Cells(i, col).value
             Next col
             .Range("CM" & i).value = ipasHeader & Chr(10) & concatenatedString
+            Sleep 700   ' 0.4 s between files
         Next i
 
         ' ======================================================================
@@ -779,7 +784,7 @@ Sub ExportPain1V9()
             Print #fileNum, columnData
             Close #fileNum
 
-            Sleep 1400   ' 0.4 s between files
+            
 
 NextRow:
         Next i
