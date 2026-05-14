@@ -658,7 +658,7 @@ Sub ExportPain1V9()
                 mi2 = Chr(Int(26 * Rnd + 65))
                 mi3 = Chr(Int(26 * Rnd + 65))
             Next j
-            
+            Dim channel As String
             If Len(CellStr(ws, i, "C")) > 0 Then
                 channel = CellStr(ws, i, "C")
             Else
