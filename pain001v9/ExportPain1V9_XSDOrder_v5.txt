@@ -1,4 +1,4 @@
-Attribute VB_Name = "ExportPain1V9_XSDOrder"
+'Attribute VB_Name = "ExportPain1V9_XSDOrder"
 ' ==============================================================================
 ' pain.001.001.09  -  Customer Credit Transfer Initiation Export
 ' CGI-MP V09  |  ISO 20022
@@ -136,7 +136,7 @@ Option Explicit
 ' ------------------------------------------------------------------------------
 Private Function CellStr(ws As Worksheet, row As Long, col As String) As String
     Dim v As Variant
-    v = ws.Range(col & row).Value
+    v = ws.Range(col & row).value
     If IsEmpty(v) Or IsNull(v) Then
         CellStr = ""
     Else
@@ -202,18 +202,18 @@ Private Function BuildIpasHeader() As String
     Dim ch           As String
     Dim milliseconds As String
 
-    ts           = Now()
-    dd           = Right("00" & Day(ts),    2)
-    mm           = Right("00" & Month(ts),  2)
-    yy           = CStr(Year(ts))
-    yy2          = Right("00" & Year(ts),   2)
-    hh           = Right("00" & Hour(ts),   2)
-    nn           = Right("00" & Minute(ts), 2)
-    ss           = Right("00" & Second(ts), 2)
+    ts = Now()
+    dd = Right("00" & Day(ts), 2)
+    mm = Right("00" & Month(ts), 2)
+    yy = CStr(Year(ts))
+    yy2 = Right("00" & Year(ts), 2)
+    hh = Right("00" & Hour(ts), 2)
+    nn = Right("00" & Minute(ts), 2)
+    ss = Right("00" & Second(ts), 2)
 
-    headerdt1    = yy2 & mm & dd & hh & nn & ss   ' 12-char short timestamp
-    headerdt2    = yy  & mm & dd & hh & nn & ss   ' 14-char long  timestamp
-    ch           = Chr(Int(26 * Rnd + 65))         ' random A-Z  (fresh each call)
+    headerdt1 = yy2 & mm & dd & hh & nn & ss      ' 12-char short timestamp
+    headerdt2 = yy & mm & dd & hh & nn & ss       ' 14-char long  timestamp
+    ch = Chr(Int(26 * Rnd + 65))                   ' random A-Z  (fresh each call)
     milliseconds = CStr(CLng(Timer * 1000) Mod 1000) ' ms since midnight (fresh)
 
     BuildIpasHeader = "IF01IPASGCH             PAIN001 PHXIPP" & _
@@ -226,19 +226,19 @@ End Function
 ' ==============================================================================
 ' Main export
 ' ==============================================================================
-Sub EEExportPain1V9()
+Sub DEEEEExportPain1V9()
 
     ' --------------------------------------------------------------------------
     ' Worksheet references
     ' --------------------------------------------------------------------------
     Dim ws  As Worksheet
     Dim ws1 As Worksheet
-    Set ws  = ThisWorkbook.Sheets("XIPfill")
+    Set ws = ThisWorkbook.Sheets("XIPfill")
     Set ws1 = ThisWorkbook.Sheets("BIClist")
 
     ' lastRow anchored to col B (as per user's version)
     Dim lastRow As Long
-    lastRow = ws.Cells(ws.Rows.Count, "B").End(xlUp).Row
+    lastRow = ws.Cells(ws.rows.Count, "B").End(xlUp).row
 
     ' --------------------------------------------------------------------------
     ' Shared date/time stamp
@@ -251,19 +251,19 @@ Sub EEExportPain1V9()
     Dim dateValue    As String, headerdt1 As String, headerdt2 As String
     Dim createdt     As String, milliseconds As String
 
-    dtsnow       = Now()
-    dd           = Right("00" & Day(dtsnow),    2)
-    mm           = Right("00" & Month(dtsnow),  2)
-    yy           = CStr(Year(dtsnow))
-    yy2          = Right("00" & Year(dtsnow),   2)
-    hh           = Right("00" & Hour(dtsnow),   2)
-    nn           = Right("00" & Minute(dtsnow), 2)
-    ss           = Right("00" & Second(dtsnow), 2)
+    dtsnow = Now()
+    dd = Right("00" & Day(dtsnow), 2)
+    mm = Right("00" & Month(dtsnow), 2)
+    yy = CStr(Year(dtsnow))
+    yy2 = Right("00" & Year(dtsnow), 2)
+    hh = Right("00" & Hour(dtsnow), 2)
+    nn = Right("00" & Minute(dtsnow), 2)
+    ss = Right("00" & Second(dtsnow), 2)
 
-    dateValue    = yy & mm & dd & "_" & hh & nn & ss & "_"
-    headerdt1    = yy2 & mm & dd & hh & nn & ss   ' for MISTRAL reference
-    headerdt2    = yy  & mm & dd & hh & nn & ss
-    createdt     = yy & "-" & mm & "-" & dd
+    dateValue = yy & mm & dd & "_" & hh & nn & ss & "_"
+    headerdt1 = yy2 & mm & dd & hh & nn & ss      ' for MISTRAL reference
+    headerdt2 = yy & mm & dd & hh & nn & ss
+    createdt = yy & "-" & mm & "-" & dd
     milliseconds = CStr(CLng(Timer * 1000) Mod 1000)  ' for PmtInfId suffix
 
     ' --------------------------------------------------------------------------
@@ -273,7 +273,7 @@ Sub EEExportPain1V9()
     rd1 = Int(100 + Rnd * 900)
 
     Dim ch  As String, cha As String
-    ch  = Chr(Int(26 * Rnd + 65))
+    ch = Chr(Int(26 * Rnd + 65))
     cha = Chr(Int(26 * Rnd + 65))
 
     ' --------------------------------------------------------------------------
@@ -309,7 +309,7 @@ Sub EEExportPain1V9()
         For i = 2 To lastRow
 
             ' BN : XML decl + Document + GrpHdr open + MsgId + CreDtTm open
-            .Range("BN" & i).Value = _
+            .Range("BN" & i).value = _
                 "<?xml version=""1.0"" encoding=""UTF-8""?>" & _
                 "<Document xmlns=""urn:iso:std:iso:20022:tech:xsd:pain.001.001.09"">" & _
                 "<CstmrCdtTrfInitn><GrpHdr>" & _
@@ -317,10 +317,10 @@ Sub EEExportPain1V9()
                 "<CreDtTm>"
 
             ' BO : CreDtTm date part  (YYYY-MM-DD)
-            .Range("BO" & i).Value = createdt
+            .Range("BO" & i).value = createdt
 
             ' BP : time suffix + NbOfTxs + CtrlSum + InitgPty (BNP client, no postal) + GrpHdr close + PmtInf open
-            .Range("BP" & i).Value = _
+            .Range("BP" & i).value = _
                 "T00:00:00</CreDtTm>" & _
                 "<NbOfTxs>1</NbOfTxs>" & _
                 "<CtrlSum>30.00</CtrlSum>" & _
@@ -329,7 +329,7 @@ Sub EEExportPain1V9()
                 "</InitgPty></GrpHdr><PmtInf>"
 
             ' BV : static Debtor block
-            .Range("BV" & i).Value = _
+            .Range("BV" & i).value = _
                 "<Dbtr>" & _
                 "<Nm>KVERNELAND AS</Nm>" & _
                 "<PstlAdr><Ctry>GB</Ctry>" & _
@@ -339,7 +339,7 @@ Sub EEExportPain1V9()
                 "</Dbtr>"
 
             ' CK : document closing tags
-            .Range("CK" & i).Value = _
+            .Range("CK" & i).value = _
                 "</CdtTrfTxInf></PmtInf></CstmrCdtTrfInitn></Document>"
 
         Next i
@@ -349,7 +349,7 @@ Sub EEExportPain1V9()
         For i = 2 To lastRow
             ref = CellStr(ws, i, "B") & rd1 & milliseconds
             If Len(CellStr(ws, i, "B")) = 0 Then ref = "userref" & rd1 & milliseconds
-            .Range("BQ" & i).Value = _
+            .Range("BQ" & i).value = _
                 "<PmtInfId>" & ref & "</PmtInfId>" & _
                 "<PmtMtd>TRF</PmtMtd>" & _
                 "<BtchBookg>false</BtchBookg>" & _
@@ -362,7 +362,7 @@ Sub EEExportPain1V9()
             Dim instrPrty As String
             instrPrty = UCase(CellStr(ws, i, "E"))
             If instrPrty <> "HIGH" And instrPrty <> "NORM" Then instrPrty = "NORM"
-            .Range("BR" & i).Value = "<PmtTpInf><InstrPrty>" & instrPrty & "</InstrPrty>"
+            .Range("BR" & i).value = "<PmtTpInf><InstrPrty>" & instrPrty & "</InstrPrty>"
         Next i
 
         ' -- SvcLvl  (col BS) -------------------------------------------------
@@ -370,9 +370,9 @@ Sub EEExportPain1V9()
             Dim svcLvl As String
             svcLvl = CellStr(ws, i, "F")
             If Len(svcLvl) > 0 Then
-                .Range("BS" & i).Value = "<SvcLvl><Cd>" & svcLvl & "</Cd></SvcLvl>"
+                .Range("BS" & i).value = "<SvcLvl><Cd>" & svcLvl & "</Cd></SvcLvl>"
             Else
-                .Range("BS" & i).Value = ""
+                .Range("BS" & i).value = ""
             End If
         Next i
 
@@ -380,25 +380,25 @@ Sub EEExportPain1V9()
         For i = 2 To lastRow
             Dim ctgyPurpCd    As String
             Dim ctgyPurpPrtry As String
-            ctgyPurpCd    = CellStr(ws, i, "G")
+            ctgyPurpCd = CellStr(ws, i, "G")
             ctgyPurpPrtry = CellStr(ws, i, "H")
             If Len(ctgyPurpCd) > 0 Then
-                .Range("BT" & i).Value = "<CtgyPurp><Cd>" & ctgyPurpCd & "</Cd></CtgyPurp>"
+                .Range("BT" & i).value = "<CtgyPurp><Cd>" & ctgyPurpCd & "</Cd></CtgyPurp>"
             ElseIf Len(ctgyPurpPrtry) > 0 Then
-                .Range("BT" & i).Value = "<CtgyPurp><Prtry>" & ctgyPurpPrtry & "</Prtry></CtgyPurp>"
+                .Range("BT" & i).value = "<CtgyPurp><Prtry>" & ctgyPurpPrtry & "</Prtry></CtgyPurp>"
             Else
-                .Range("BT" & i).Value = ""
+                .Range("BT" & i).value = ""
             End If
         Next i
 
         ' -- ReqdExctnDt  (col BU) --------------------------------------------
         For i = 2 To lastRow
-            inp     = Now() + .Range("I" & i).Value
-            dd      = Right("00" & Day(inp),   2)
-            mm      = Right("00" & Month(inp), 2)
-            yy      = CStr(Year(inp))
+            inp = Now() + .Range("I" & i).value
+            dd = Right("00" & Day(inp), 2)
+            mm = Right("00" & Month(inp), 2)
+            yy = CStr(Year(inp))
             exeDate = yy & "-" & mm & "-" & dd
-            .Range("BU" & i).Value = _
+            .Range("BU" & i).value = _
                 "</PmtTpInf>" & _
                 "<ReqdExctnDt><Dt>" & exeDate & "</Dt></ReqdExctnDt>"
         Next i
@@ -406,12 +406,12 @@ Sub EEExportPain1V9()
         ' -- DbtrAcct + DbtrAgt open  (col BW) --------------------------------
         For i = 2 To lastRow
             If CellStr(ws, i, "K") = "IBAN" Then
-                .Range("BW" & i).Value = _
+                .Range("BW" & i).value = _
                     "<DbtrAcct><Id><IBAN>" & CellStr(ws, i, "L") & "</IBAN></Id>" & _
                     "<Ccy>" & CellStr(ws, i, "M") & "</Ccy></DbtrAcct>" & _
                     "<DbtrAgt><FinInstnId>"
             Else
-                .Range("BW" & i).Value = _
+                .Range("BW" & i).value = _
                     "<DbtrAcct><Id><Othr><Id>" & CellStr(ws, i, "L") & "</Id></Othr></Id>" & _
                     "<Ccy>" & CellStr(ws, i, "M") & "</Ccy></DbtrAcct>" & _
                     "<DbtrAgt><FinInstnId>"
@@ -421,37 +421,37 @@ Sub EEExportPain1V9()
         ' -- DbtrAgt BICFI lookup  (col BX raw, col BY XML) -------------------
         For i = 2 To lastRow
             On Error Resume Next
-            .Range("BX" & i).Value = Application.WorksheetFunction.VLookup( _
+            .Range("BX" & i).value = Application.WorksheetFunction.VLookup( _
                 ws.Range("J" & i), Myrange, 2, False)
             On Error GoTo 0
-            .Range("BY" & i).Value = _
+            .Range("BY" & i).value = _
                 "<BICFI>" & CellStr(ws, i, "BX") & "</BICFI>" & _
                 "</FinInstnId></DbtrAgt>"
         Next i
 
         ' -- ChrgBr + CdtTrfTxInf/PmtId open  (col BZ) -----------------------
         For i = 2 To lastRow
-            .Range("BZ" & i).Value = _
+            .Range("BZ" & i).value = _
                 "<ChrgBr>" & CellStr(ws, i, "N") & "</ChrgBr>" & _
                 "<CdtTrfTxInf><PmtId>"
         Next i
 
         ' -- InstrId  (col CA) ------------------------------------------------
         For i = 2 To lastRow
-            .Range("CA" & i).Value = XTag("InstrId", CellStr(ws, i, "O"))
+            .Range("CA" & i).value = XTag("InstrId", CellStr(ws, i, "O"))
         Next i
 
         ' -- EndToEndId  (col CB) ---------------------------------------------
         For i = 2 To lastRow
             sta = CellStr(ws, i, "P")
             If Len(sta) = 0 Then sta = "Eid" & rd1
-            .Range("CB" & i).Value = "<EndToEndId>" & sta & "</EndToEndId>"
+            .Range("CB" & i).value = "<EndToEndId>" & sta & "</EndToEndId>"
         Next i
 
         ' -- Random fallback for InstdAmt value  ------------------------------
         For i = 2 To lastRow
-            If IsEmpty(.Range("R" & i).Value) Then
-                .Range("R" & i).Value = Int(100 + Rnd * 900)
+            If IsEmpty(.Range("R" & i).value) Then
+                .Range("R" & i).value = Int(100 + Rnd * 900)
             End If
         Next i
 
@@ -461,7 +461,7 @@ Sub EEExportPain1V9()
             Dim amtBlock As String
             eqvtAmtVal = CellStr(ws, i, "S")
             eqvtAmtCcy = CellStr(ws, i, "T")
-            ccyOfTrf   = CellStr(ws, i, "U")
+            ccyOfTrf = CellStr(ws, i, "U")
             If Len(eqvtAmtVal) > 0 And Len(eqvtAmtCcy) > 0 And Len(ccyOfTrf) > 0 Then
                 amtBlock = "<Amt><EqvtAmt>" & _
                            "<Amt Ccy=""" & eqvtAmtCcy & """>" & eqvtAmtVal & "</Amt>" & _
@@ -471,7 +471,7 @@ Sub EEExportPain1V9()
                 amtBlock = "<Amt><InstdAmt Ccy=""" & CellStr(ws, i, "Q") & """>" & _
                            CellStr(ws, i, "R") & "</InstdAmt></Amt>"
             End If
-            .Range("CC" & i).Value = "</PmtId>" & amtBlock & "<CdtrAgt>"
+            .Range("CC" & i).value = "</PmtId>" & amtBlock & "<CdtrAgt>"
         Next i
 
         ' -- CdtrAgt FinInstnId + PstlAdr (from BICFI chars 5-6) + Cdtr open  (col CD)
@@ -480,8 +480,8 @@ Sub EEExportPain1V9()
             Dim cdtrBicfi   As String, clrSysCd As String, mmbId As String
             Dim clrSysBlock As String, finInstnBlock As String
             cdtrBicfi = CellStr(ws, i, "V")
-            clrSysCd  = CellStr(ws, i, "W")
-            mmbId     = CellStr(ws, i, "X")
+            clrSysCd = CellStr(ws, i, "W")
+            mmbId = CellStr(ws, i, "X")
 
             cellValue = cdtrBicfi
             If Len(cellValue) >= 6 Then
@@ -507,11 +507,12 @@ Sub EEExportPain1V9()
             If Len(cdtrBicfi) > 0 Then
                 finInstnBlock = finInstnBlock & "<BICFI>" & cdtrBicfi & "</BICFI>"
             End If
-            finInstnBlock = finInstnBlock & clrSysBlock & "</FinInstnId>"
+            
+            finInstnBlock = finInstnBlock & clrSysBlock
 
             ' CdtrAgt gets PstlAdr with country from BICFI chars 5-6
-            .Range("CD" & i).Value = finInstnBlock & _
-                "<PstlAdr><Ctry>" & extracted & "</Ctry></PstlAdr></CdtrAgt>" & _
+            .Range("CD" & i).value = finInstnBlock & _
+                "<PstlAdr><Ctry>" & extracted & "</Ctry></PstlAdr></FinInstnId></CdtrAgt>" & _
                 "<Cdtr><Nm>Abigail Gerfried</Nm><PstlAdr>"
         Next i
 
@@ -524,7 +525,7 @@ Sub EEExportPain1V9()
             Else
                 extracted = ""
             End If
-            .Range("CE" & i).Value = _
+            .Range("CE" & i).value = _
                 "<Ctry>" & extracted & "</Ctry>" & _
                 "<AdrLine>Schulstrasse 4</AdrLine>" & _
                 "<AdrLine>32547 Bad Oyenhausen</AdrLine></PstlAdr>" & _
@@ -534,11 +535,11 @@ Sub EEExportPain1V9()
         ' -- CdtrAcct  (col CF) -----------------------------------------------
         For i = 2 To lastRow
             If CellStr(ws, i, "Y") = "IBAN" Then
-                .Range("CF" & i).Value = _
+                .Range("CF" & i).value = _
                     "<CdtrAcct><Id><IBAN>" & CellStr(ws, i, "Z") & "</IBAN></Id>" & _
                     "<Ccy>" & CellStr(ws, i, "Q") & "</Ccy></CdtrAcct>"
             Else
-                .Range("CF" & i).Value = _
+                .Range("CF" & i).value = _
                     "<CdtrAcct><Id><Othr><Id>" & CellStr(ws, i, "Z") & "</Id></Othr></Id>" & _
                     "<Ccy>" & CellStr(ws, i, "Q") & "</Ccy></CdtrAcct>"
             End If
@@ -548,14 +549,14 @@ Sub EEExportPain1V9()
         For i = 2 To lastRow
             Dim purpCd    As String
             Dim purpPrtry As String
-            purpCd    = CellStr(ws, i, "AA")
+            purpCd = CellStr(ws, i, "AA")
             purpPrtry = CellStr(ws, i, "AB")
             If Len(purpCd) > 0 Then
-                .Range("CG" & i).Value = "<Purp><Cd>" & purpCd & "</Cd></Purp>"
+                .Range("CG" & i).value = "<Purp><Cd>" & purpCd & "</Cd></Purp>"
             ElseIf Len(purpPrtry) > 0 Then
-                .Range("CG" & i).Value = "<Purp><Prtry>" & purpPrtry & "</Prtry></Purp>"
+                .Range("CG" & i).value = "<Purp><Prtry>" & purpPrtry & "</Prtry></Purp>"
             Else
-                .Range("CG" & i).Value = ""
+                .Range("CG" & i).value = ""
             End If
         Next i
 
@@ -565,42 +566,42 @@ Sub EEExportPain1V9()
         ' Suppress if col AI is non-empty.
         For i = 2 To lastRow
             If Len(CellStr(ws, i, "AI")) = 0 Then
-                .Range("CL" & i).Value = _
+                .Range("CL" & i).value = _
                     "<InstrForCdtrAgt><InstrInf>" & _
-                    "SIMUL_FBK//AUTH/OK/AMI000/E0//SIMUL_FBK//BOOK/OK/AMI000/" & _
+                    "SIMUL-FBK//AUTH/OK/AMI000/E0/ SIMUL-FBK//BOOK/OK/AMI000/" & _
                     "</InstrInf></InstrForCdtrAgt>"
             Else
-                .Range("CL" & i).Value = ""
+                .Range("CL" & i).value = ""
             End If
         Next i
 
         ' -- RegulatoryReporting  (cols CH, CI) --------------------------------
         For i = 2 To lastRow
             rgCd = CellStr(ws, i, "AC")
-            rg1  = CellStr(ws, i, "AD")
-            rg2  = CellStr(ws, i, "AE")
-            rg3  = CellStr(ws, i, "AF")
-            rg4  = CellStr(ws, i, "AG")
-            rg5  = CellStr(ws, i, "AH")
+            rg1 = CellStr(ws, i, "AD")
+            rg2 = CellStr(ws, i, "AE")
+            rg3 = CellStr(ws, i, "AF")
+            rg4 = CellStr(ws, i, "AG")
+            rg5 = CellStr(ws, i, "AH")
 
             Dim hasRgltry As Boolean
             hasRgltry = (Len(rgCd) > 0 Or Len(rg1) > 0 Or Len(rg2) > 0 Or _
-                         Len(rg3)  > 0 Or Len(rg4) > 0 Or Len(rg5) > 0)
+                         Len(rg3) > 0 Or Len(rg4) > 0 Or Len(rg5) > 0)
             If hasRgltry Then
                 Dim dtlsBlock As String
                 dtlsBlock = "<Dtls>"
-                dtlsBlock = dtlsBlock & XTag("Cd",  rgCd)
+                dtlsBlock = dtlsBlock & XTag("Cd", rgCd)
                 dtlsBlock = dtlsBlock & XTag("Inf", rg1)
                 dtlsBlock = dtlsBlock & XTag("Inf", rg2)
                 dtlsBlock = dtlsBlock & XTag("Inf", rg3)
                 dtlsBlock = dtlsBlock & XTag("Inf", rg4)
                 dtlsBlock = dtlsBlock & XTag("Inf", rg5)
                 dtlsBlock = dtlsBlock & "</Dtls>"
-                .Range("CH" & i).Value = "<RgltryRptg>" & dtlsBlock
-                .Range("CI" & i).Value = "</RgltryRptg>"
+                .Range("CH" & i).value = "<RgltryRptg>" & dtlsBlock
+                .Range("CI" & i).value = "</RgltryRptg>"
             Else
-                .Range("CH" & i).Value = ""
-                .Range("CI" & i).Value = ""
+                .Range("CH" & i).value = ""
+                .Range("CI" & i).value = ""
             End If
         Next i
 
@@ -609,12 +610,12 @@ Sub EEExportPain1V9()
         ' AJ (user free text) goes into a second separate <Ustrd> if populated.
         ' Channel read from col C; defaults to SFA if empty.
         For i = 2 To lastRow
-            randomNumber  = ""
+            randomNumber = ""
             randomNumber1 = ""
             For j = 1 To 2
-                randomNumber  = randomNumber  & CStr(Int(10 * Rnd))
+                randomNumber = randomNumber & CStr(Int(10 * Rnd))
                 randomNumber1 = randomNumber1 & CStr(Int(10 * Rnd))
-                randomDigit   = Int(10 * Rnd)
+                randomDigit = Int(10 * Rnd)
                 mi1 = Chr(Int(26 * Rnd + 65))
                 mi2 = Chr(Int(26 * Rnd + 65))
                 mi3 = Chr(Int(26 * Rnd + 65))
@@ -666,7 +667,7 @@ Sub EEExportPain1V9()
             If Len(mistralContent) > 0 Or Len(strdBlock) > 0 Then
                 rmtInfBlock = "<RmtInf>" & ustrdBlock & strdBlock & "</RmtInf>"
             End If
-            .Range("CJ" & i).Value = rmtInfBlock
+            .Range("CJ" & i).value = rmtInfBlock
         Next i
 
         ' -- Concatenate XML fragment columns -> col CM -----------------------
@@ -682,9 +683,9 @@ Sub EEExportPain1V9()
         For i = 2 To lastRow
             concatenatedString = ""
             For Each col In xmlCols
-                concatenatedString = concatenatedString & .Cells(i, col).Value
+                concatenatedString = concatenatedString & .Cells(i, col).value
             Next col
-            .Range("CM" & i).Value = concatenatedString   ' XML body only
+            .Range("CM" & i).value = concatenatedString   ' XML body only
         Next i
 
         ' ======================================================================
@@ -698,7 +699,7 @@ Sub EEExportPain1V9()
         ' Sleep 700ms placed HERE (not in the concat loop where it was before)
         ' so the delay separates file writes and guarantees unique timestamps.
         ' ======================================================================
-        Path = "F:\BusinessData\Payment\Shared\2 - PAY Tools\IP\temp\EXPORT\"
+        Path = "F:\BusinessData\Payment\Shared\2 - PAY Tools\IP\EXPORT\"
 
         Dim fileNum As Integer
 
@@ -711,7 +712,7 @@ Sub EEExportPain1V9()
             If Len(pmtRef) = 0 Then pmtRef = "userref" & rd1
 
             ' File name: J (debtor bank code) + pmtRef + Rand4 + version tag
-            filePath = Path & ws.Range("J" & i).Value & "_" & pmtRef & "_" & Rand4() & "_Pain001v9.txt"
+            filePath = Path & ws.Range("J" & i).value & "_" & pmtRef & "_" & Rand4() & "_Pain001v9.txt"
 
             fileNum = FreeFile
             Open filePath For Output As #fileNum
@@ -736,3 +737,6 @@ NextRow:
     MsgBox " Export completed "
 
 End Sub
+
+
+
