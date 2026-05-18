@@ -194,19 +194,14 @@ End Function
 ' Now this function captures Now() and Timer at the moment it is called,
 ' so each file written in the export loop gets its own unique header.
 ' ------------------------------------------------------------------------------
-Private Function BuildIpasHeader() As String
+Private Function BuildIpasHeader(ws As Worksheet, row As Long) As String
     Dim ts           As Variant
     Dim dd           As String, mm As String, yy As String, yy2 As String
     Dim hh           As String, nn As String, ss As String
     Dim headerdt1    As String, headerdt2 As String
     Dim ch           As String
     Dim milliseconds, GCHcheck As String
-    
-    Dim ws  As Worksheet
-    Dim ws1 As Worksheet
-    Set ws = ThisWorkbook.Sheets("XIPfill")
 
-    
     ts = Now()
     dd = Right("00" & Day(ts), 2)
     mm = Right("00" & Month(ts), 2)
@@ -220,22 +215,23 @@ Private Function BuildIpasHeader() As String
     headerdt2 = yy & mm & dd & hh & nn & ss       ' 14-char long  timestamp
     ch = Chr(Int(26 * Rnd + 65))                   ' random A-Z  (fresh each call)
     milliseconds = CStr(CLng(Timer * 1000) Mod 1000) ' ms since midnight (fresh)
-    
-    
-    If IsEmpty(.Range("D" & i).value) Then
-    
-    GCHcheck = "Default value for empty cell"
-    ElseIf .Range("D" & i).value = GCH Then
-    GCHcheck = "IF01IPASGCH             PAIN001"
-    ElseIf .Range("D" & i).value = EMX Then
-    GCHcheck = "IF01EMX                 PAIN001"
-    ElseIf .Range("D" & i).value = ITL Then
-    GCHcheck = "IF01ITL                 SCBCTCB"
+
+    ' Read col D for the clearing house code; compare as string literals
+    Dim dVal As String
+    dVal = Trim(CStr(ws.Cells(row, "D").Value))
+
+    If Len(dVal) = 0 Then
+        GCHcheck = "IF01IPASGCH             PAIN001"   ' default when cell is empty
+    ElseIf dVal = "GCH" Then
+        GCHcheck = "IF01IPASGCH             PAIN001"
+    ElseIf dVal = "EMX" Then
+        GCHcheck = "IF01EMX                 PAIN001"
+    ElseIf dVal = "ITL" Then
+        GCHcheck = "IF01ITL                 SCBCTCB"
     Else
-    GCHcheck = "IF01IPASGCH             PAIN001"
+        GCHcheck = "IF01IPASGCH             PAIN001"
     End If
 
-        
     BuildIpasHeader = GCHcheck & " PHXIPP" & _
                       headerdt1 & ch & milliseconds & Space(20) & headerdt2 & _
                       "INPUT                                   00000000" & _
@@ -736,7 +732,7 @@ Sub DEEEEExportPain1V9()
 
             fileNum = FreeFile
             Open filePath For Output As #fileNum
-            Print #fileNum, BuildIpasHeader()   ' fresh unique header for THIS file
+            Print #fileNum, BuildIpasHeader(ws, i)   ' fresh unique header for THIS file
             Print #fileNum, columnData          ' XML body from col CM
             Close #fileNum
 
