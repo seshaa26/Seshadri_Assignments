@@ -1,0 +1,770 @@
+'Attribute VB_Name = "ExportPain1V9_XSDOrder"
+' ==============================================================================
+' pain.001.001.09  -  Customer Credit Transfer Initiation Export
+' CGI-MP V09  |  ISO 20022
+'
+' INPUT COLUMN MAP  (XIPfill sheet)  -  left-to-right in XSD order
+' Row 1 = column headers  |  Row 2 onwards = data
+' Cols C and D are intentionally left FREE / reserved.
+' ==============================================================================
+'
+'  +------+-------------------------------------------------------------------+
+'  | Col  | XSD Path / Purpose                                                |
+'  +------+-------------------------------------------------------------------+
+'  |  B   | PmtInf / PmtInfId                 (auto-generated if empty)      |
+'  |  C   | MISTRAL channel override           default = SFA                  |
+'  |  D   | ** FREE **                                                        |
+'  +------+-------------------------------------------------------------------+
+'  |  PmtInf / PmtTpInf                                                      |
+'  +------+-------------------------------------------------------------------+
+'  |  E   | InstrPrty                          HIGH | NORM  (default NORM)    |
+'  |  F   | SvcLvl / Cd                        e.g. SDVA   (blank = omit)    |
+'  |  G   | CtgyPurp / Cd                      4-char code (blank = omit)    |
+'  |  H   | CtgyPurp / Prtry                   Max35Text   (used if G empty) |
+'  +------+-------------------------------------------------------------------+
+'  |  I   | ReqdExctnDt  days offset from today                              |
+'  +------+-------------------------------------------------------------------+
+'  |  Debtor  (PmtInf level)                                                 |
+'  +------+-------------------------------------------------------------------+
+'  |  J   | Debtor bank code   (BIC lookup key in BIClist sheet)             |
+'  |  K   | Debtor account type flag           IBAN | other                  |
+'  |  L   | Debtor account number              IBAN value or Othr/Id         |
+'  |  M   | Debtor account currency            Ccy  e.g. GBP                 |
+'  +------+-------------------------------------------------------------------+
+'  |  N   | ChrgBr                             DEBT | CRED | SHAR | SLEV     |
+'  +------+-------------------------------------------------------------------+
+'  |  CdtTrfTxInf / PmtId                                                    |
+'  +------+-------------------------------------------------------------------+
+'  |  O   | InstrId                            (optional)                    |
+'  |  P   | EndToEndId                         (auto-generated if empty)     |
+'  +------+-------------------------------------------------------------------+
+'  |  Amount  -  AmountType4Choice: InstdAmt  OR  EqvtAmt                    |
+'  +------+-------------------------------------------------------------------+
+'  |  Q   | InstdAmt  Ccy attribute            e.g. EUR                      |
+'  |  R   | InstdAmt  value                    numeric (random if empty)     |
+'  |  S   | EqvtAmt  Amt value        *filled -> EqvtAmt path taken*         |
+'  |  T   | EqvtAmt  Amt Ccy                                                 |
+'  |  U   | EqvtAmt  CcyOfTrf                                                |
+'  +------+-------------------------------------------------------------------+
+'  |  Creditor Agent                                                          |
+'  +------+-------------------------------------------------------------------+
+'  |  V   | CdtrAgt / FinInstnId / BICFI                                     |
+'  |  W   | CdtrAgt / ClrSysMmbId / ClrSysId / Cd     e.g. CHAPS (optional)  |
+'  |  X   | CdtrAgt / ClrSysMmbId / ClrSysId / Prtry  Max35Text  (XSD choice:|
+'  |      |   Cd OR Prtry - Cd takes priority; both blank = ClrSysId omitted) |
+'  |  Y   | CdtrAgt / ClrSysMmbId / MmbId             (optional)              |
+'  +------+-------------------------------------------------------------------+
+'  |  Creditor Account                                                        |
+'  +------+-------------------------------------------------------------------+
+'  |  Z   | Creditor account type flag         IBAN | other                  |
+'  |  AA  | Creditor account number            IBAN value or Othr/Id         |
+'  +------+-------------------------------------------------------------------+
+'  |  Purpose  -  Purpose2Choice: Cd  OR  Prtry                              |
+'  +------+-------------------------------------------------------------------+
+'  |  AB  | Purp / Cd           ExternalPurpose1Code (Cd takes priority)     |
+'  |  AC  | Purp / Prtry        Max35Text  (used only when AB empty)         |
+'  +------+-------------------------------------------------------------------+
+'  |  Regulatory Reporting  -  StructuredRegulatoryReporting3                |
+'  +------+-------------------------------------------------------------------+
+'  |  AD  | RgltryRptg / Dtls / Cd            Max10Text  (optional)          |
+'  |  AE  | RgltryRptg / Dtls / Inf  line 1   Max35Text                      |
+'  |  AF  | RgltryRptg / Dtls / Inf  line 2                                  |
+'  |  AG  | RgltryRptg / Dtls / Inf  line 3                                  |
+'  |  AH  | RgltryRptg / Dtls / Inf  line 4                                  |
+'  |  AI  | RgltryRptg / Dtls / Inf  line 5                                  |
+'  +------+-------------------------------------------------------------------+
+'  |  Remittance Information                                                  |
+'  +------+-------------------------------------------------------------------+
+'  |  AJ  | Bouchons suppress flag   non-empty = suppress simulation tags    |
+'  |  AK  | RmtInf / Ustrd  user text line 1  (separate Ustrd from MISTRAL)  |
+'  |  AL  | ** FREE **                                                        |
+'  |  AM  | RmtInf / Strd / AddtlRmtInf  line 1   Max140Text                 |
+'  |  AN  | RmtInf / Strd / AddtlRmtInf  line 2                              |
+'  |  AO  | RmtInf / Strd / AddtlRmtInf  line 3                              |
+'  |  AP  | RmtInf / Strd / AddtlRmtInf  line 4                              |
+'  |  AQ  | RmtInf / Strd / AddtlRmtInf  line 5                              |
+'  +------+-------------------------------------------------------------------+
+'  |  BA3 | Output folder path  (currently hardcoded - see export section)   |
+'  +------+-------------------------------------------------------------------+
+'
+'  WORK columns  BN : CM  (hidden area - do not edit manually)
+'
+'  KEY FIX: The IPAS header is built fresh per file via BuildIpasHeader()
+'  called inside the export loop.  Col CM stores the XML body ONLY.
+'  This ensures every output file gets a unique timestamp + random seed.
+'
+'  +------+-------------------------------------------------------------------+
+'  |  BN  | XML decl + GrpHdr open                                           |
+'  |  BO  | CreDtTm date part                                                |
+'  |  BP  | GrpHdr close + PmtInf open  (incl. CtrlSum, BNP client)          |
+'  |  BQ  | PmtInfId + PmtMtd + BtchBookg + NbOfTxs + CtrlSum               |
+'  |  BR  | PmtTpInf open + InstrPrty                                        |
+'  |  BS  | SvcLvl XML  (or "")                                              |
+'  |  BT  | CtgyPurp XML  (or "")                                            |
+'  |  BU  | close PmtTpInf + ReqdExctnDt                                     |
+'  |  BV  | Static Debtor block                                              |
+'  |  BW  | DbtrAcct + DbtrAgt open                                          |
+'  |  BX  | BICFI raw lookup result  (intermediate only)                     |
+'  |  BY  | <BICFI>...</BICFI></FinInstnId></DbtrAgt>                         |
+'  |  BZ  | <ChrgBr>...</ChrgBr><CdtTrfTxInf><PmtId>                         |
+'  |  CA  | <InstrId>...</InstrId>  or ""                                    |
+'  |  CB  | <EndToEndId>...</EndToEndId>                                     |
+'  |  CC  | Amt block  (InstdAmt or EqvtAmt)                                 |
+'  |  CD  | CdtrAgt FinInstnId + PstlAdr + Cdtr open                         |
+'  |  CE  | Cdtr address + close                                             |
+'  |  CF  | CdtrAcct                                                         |
+'  |  CG  | Purp XML  (or "")                                                |
+'  |  CL  | InstrForCdtrAgt bouchons block  (or "")  <- placed between       |
+'  |      |   CG and CH in xmlCols so it sits before RgltryRptg in XML       |
+'  |  CH  | RgltryRptg open + Dtls block                                     |
+'  |  CI  | </RgltryRptg>  (or "")                                           |
+'  |  CJ  | RmtInf block  (MISTRAL Ustrd + AJ Ustrd + Strd)                  |
+'  |  CK  | </CdtTrfTxInf></PmtInf></CstmrCdtTrfInitn></Document>            |
+'  |  CM  | FINAL XML body (NO IPAS header - header added fresh at export)   |
+'  +------+-------------------------------------------------------------------+
+' ==============================================================================
+
+Option Explicit
+
+' Windows API for millisecond sleep
+#If VBA7 Then
+    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+#Else
+    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+#End If
+
+' ------------------------------------------------------------------------------
+' Helper: safely read a cell as trimmed string
+' ------------------------------------------------------------------------------
+Private Function CellStr(ws As Worksheet, row As Long, col As String) As String
+    Dim v As Variant
+    v = ws.Range(col & row).value
+    If IsEmpty(v) Or IsNull(v) Then
+        CellStr = ""
+    Else
+        CellStr = Trim(CStr(v))
+    End If
+End Function
+
+' ------------------------------------------------------------------------------
+' Helper: wrap value in XML tag; returns "" when value is empty
+' ------------------------------------------------------------------------------
+Private Function XTag(tag As String, value As String) As String
+    If Len(value) = 0 Then
+        XTag = ""
+    Else
+        XTag = "<" & tag & ">" & value & "</" & tag & ">"
+    End If
+End Function
+
+' ------------------------------------------------------------------------------
+' Helper: generate a unique 12-char alphanumeric ID  (A-Z, 0-9)
+' ------------------------------------------------------------------------------
+Private Function UniqueId12() As String
+    Dim chars  As String
+    Dim result As String
+    Dim k      As Integer
+    chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    result = ""
+    For k = 1 To 12
+        result = result & Mid(chars, Int(36 * Rnd) + 1, 1)
+    Next k
+    UniqueId12 = result
+End Function
+
+' ------------------------------------------------------------------------------
+' Helper: generate a random 4-char alphanumeric string  (A-Z, 0-9)
+' ------------------------------------------------------------------------------
+Private Function Rand4() As String
+    Dim chars  As String
+    Dim result As String
+    Dim k      As Integer
+    chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    result = ""
+    For k = 1 To 4
+        result = result & Mid(chars, Int(36 * Rnd) + 1, 1)
+    Next k
+    Rand4 = result
+End Function
+
+' ------------------------------------------------------------------------------
+' KEY FIX: Build a fresh IPAS header on every call.
+'
+' Previously ipasHeader was built ONCE before the loops, so all files shared
+' the same headerdt1/headerdt2 timestamp, ch (random char) and milliseconds.
+'
+' Now this function captures Now() and Timer at the moment it is called,
+' so each file written in the export loop gets its own unique header.
+' ------------------------------------------------------------------------------
+Private Function BuildIpasHeader(ws As Worksheet, row As Long) As String
+    Dim ts           As Variant
+    Dim dd           As String, mm As String, yy As String, yy2 As String
+    Dim hh           As String, nn As String, ss As String
+    Dim headerdt1    As String, headerdt2 As String
+    Dim ch           As String
+    Dim milliseconds, GCHcheck As String
+
+    ts = Now()
+    dd = Right("00" & Day(ts), 2)
+    mm = Right("00" & Month(ts), 2)
+    yy = CStr(Year(ts))
+    yy2 = Right("00" & Year(ts), 2)
+    hh = Right("00" & Hour(ts), 2)
+    nn = Right("00" & Minute(ts), 2)
+    ss = Right("00" & Second(ts), 2)
+
+    headerdt1 = yy2 & mm & dd & hh & nn & ss      ' 12-char short timestamp
+    headerdt2 = yy & mm & dd & hh & nn & ss       ' 14-char long  timestamp
+    ch = Chr(Int(26 * Rnd + 65))                   ' random A-Z  (fresh each call)
+    milliseconds = CStr(CLng(Timer * 1000) Mod 1000) ' ms since midnight (fresh)
+
+    ' Read col D for the clearing house code; compare as string literals
+    Dim dVal As String
+    dVal = Trim(CStr(ws.Cells(row, "D").Value))
+
+    If Len(dVal) = 0 Then
+        GCHcheck = "IF01IPASGCH             PAIN001"   ' default when cell is empty
+    ElseIf dVal = "GCH" Then
+        GCHcheck = "IF01IPASGCH             PAIN001"
+    ElseIf dVal = "EMX" Then
+        GCHcheck = "IF01EMX                 PAIN001"
+    ElseIf dVal = "ITL" Then
+        GCHcheck = "IF01ITL                 SCBCTCB"
+    Else
+        GCHcheck = "IF01IPASGCH             PAIN001"
+    End If
+
+    BuildIpasHeader = GCHcheck & " PHXIPP" & _
+                      headerdt1 & ch & milliseconds & Space(20) & headerdt2 & _
+                      "INPUT                                   00000000" & _
+                      "                    00000000" & _
+                      "                    00000000" & Space(110)
+End Function
+
+' ==============================================================================
+' Main export
+' ==============================================================================
+Sub DEEEEExportPain1V9()
+
+    ' --------------------------------------------------------------------------
+    ' Worksheet references
+    ' --------------------------------------------------------------------------
+    Dim ws  As Worksheet
+    Dim ws1 As Worksheet
+    Set ws = ThisWorkbook.Sheets("XIPfill")
+    Set ws1 = ThisWorkbook.Sheets("BIClist")
+
+    ' lastRow anchored to col B (as per user's version)
+    Dim lastRow As Long
+    lastRow = ws.Cells(ws.rows.Count, "B").End(xlUp).row
+
+    ' --------------------------------------------------------------------------
+    ' Shared date/time stamp
+    ' Used for: CreDtTm, execution date arithmetic, MISTRAL reference, PmtInfId.
+    ' NOT used for IPAS header - BuildIpasHeader() handles that per file.
+    ' --------------------------------------------------------------------------
+    Dim dtsnow       As Variant
+    Dim dd           As String, mm As String, yy As String, yy2 As String
+    Dim hh           As String, nn As String, ss As String
+    Dim dateValue    As String, headerdt1 As String, headerdt2 As String
+    Dim createdt     As String, milliseconds As String
+
+    dtsnow = Now()
+    dd = Right("00" & Day(dtsnow), 2)
+    mm = Right("00" & Month(dtsnow), 2)
+    yy = CStr(Year(dtsnow))
+    yy2 = Right("00" & Year(dtsnow), 2)
+    hh = Right("00" & Hour(dtsnow), 2)
+    nn = Right("00" & Minute(dtsnow), 2)
+    ss = Right("00" & Second(dtsnow), 2)
+
+    dateValue = yy & mm & dd & "_" & hh & nn & ss & "_"
+    headerdt1 = yy2 & mm & dd & hh & nn & ss      ' for MISTRAL reference
+    headerdt2 = yy & mm & dd & hh & nn & ss
+    createdt = yy & "-" & mm & "-" & dd
+    milliseconds = CStr(CLng(Timer * 1000) Mod 1000)  ' for PmtInfId suffix
+
+    ' --------------------------------------------------------------------------
+    ' rd1: fallback seed for PmtInfId / EndToEndId auto-generation
+    ' --------------------------------------------------------------------------
+    Dim rd1 As Integer
+    rd1 = Int(100 + Rnd * 900)
+
+    Dim ch  As String, cha As String
+    ch = Chr(Int(26 * Rnd + 65))
+    cha = Chr(Int(26 * Rnd + 65))
+
+    ' --------------------------------------------------------------------------
+    ' BIC lookup range  (col J -> BIClist A:B)
+    ' --------------------------------------------------------------------------
+    Dim Myrange As Variant
+    Set Myrange = ws1.Range("A:B")
+
+    ' --------------------------------------------------------------------------
+    ' Working variables
+    ' --------------------------------------------------------------------------
+    Dim i As Long, j As Long
+    Dim ref As String, sta As String
+    Dim rgCd As String
+    Dim rg1 As String, rg2 As String, rg3 As String, rg4 As String, rg5 As String
+    Dim rm1 As String
+    Dim randomNumber As String, randomNumber1 As String
+    Dim randomDigit  As Integer
+    Dim mi1 As String, mi2 As String, mi3 As String
+    Dim mistralContent As String, bouchonsContent As String, ustrdContent As String
+    Dim cellValue As String, extracted As String
+    Dim inp As Variant, exeDate As String
+    Dim col As Variant, concatenatedString As String
+    Dim columnData As String, filePath As String, Path As String
+
+    With ws
+
+        ' ======================================================================
+        ' PHASE 1: Build all XML fragment columns  (rows 2 to lastRow)
+        ' ======================================================================
+
+        ' -- Static open/close fragments (BN, BO, BP, BV, CK) -----------------
+        For i = 2 To lastRow
+
+            ' BN : XML decl + Document + GrpHdr open + MsgId + CreDtTm open
+            .Range("BN" & i).value = _
+                "<?xml version=""1.0"" encoding=""UTF-8""?>" & _
+                "<Document xmlns=""urn:iso:std:iso:20022:tech:xsd:pain.001.001.09"">" & _
+                "<CstmrCdtTrfInitn><GrpHdr>" & _
+                "<MsgId>" & UniqueId12() & "</MsgId>" & _
+                "<CreDtTm>"
+
+            ' BO : CreDtTm date part  (YYYY-MM-DD)
+            .Range("BO" & i).value = createdt
+
+            ' BP : time suffix + NbOfTxs + CtrlSum + InitgPty (BNP client, no postal) + GrpHdr close + PmtInf open
+            .Range("BP" & i).value = _
+                "T00:00:00</CreDtTm>" & _
+                "<NbOfTxs>1</NbOfTxs>" & _
+                "<CtrlSum>30.00</CtrlSum>" & _
+                "<InitgPty>" & _
+                "<Nm>BNP client</Nm>" & _
+                "</InitgPty></GrpHdr><PmtInf>"
+
+            ' BV : static Debtor block
+            .Range("BV" & i).value = _
+                "<Dbtr>" & _
+                "<Nm>KVERNELAND AS</Nm>" & _
+                "<PstlAdr><Ctry>GB</Ctry>" & _
+                "<AdrLine>PLOGFABRIKKVEGEN 1</AdrLine>" & _
+                "<AdrLine>4353 KLEPP ST.</AdrLine></PstlAdr>" & _
+                "<CtryOfRes>GB</CtryOfRes>" & _
+                "</Dbtr>"
+
+            ' CK : document closing tags
+            .Range("CK" & i).value = _
+                "</CdtTrfTxInf></PmtInf></CstmrCdtTrfInitn></Document>"
+
+        Next i
+
+        ' -- PmtInfId + PmtMtd + BtchBookg + NbOfTxs + CtrlSum  (col BQ) -----
+        ' PmtInfId = user value (col B) + rd1 + milliseconds for uniqueness
+        For i = 2 To lastRow
+            ref = CellStr(ws, i, "B") & rd1 & milliseconds
+            If Len(CellStr(ws, i, "B")) = 0 Then ref = "userref" & rd1 & milliseconds
+            .Range("BQ" & i).value = _
+                "<PmtInfId>" & ref & "</PmtInfId>" & _
+                "<PmtMtd>TRF</PmtMtd>" & _
+                "<BtchBookg>false</BtchBookg>" & _
+                "<NbOfTxs>1</NbOfTxs>" & _
+                "<CtrlSum>30.00</CtrlSum>"
+        Next i
+
+        ' -- InstrPrty  (col BR) ----------------------------------------------
+        For i = 2 To lastRow
+            Dim instrPrty As String
+            instrPrty = UCase(CellStr(ws, i, "E"))
+            If instrPrty <> "HIGH" And instrPrty <> "NORM" Then instrPrty = "NORM"
+            .Range("BR" & i).value = "<PmtTpInf><InstrPrty>" & instrPrty & "</InstrPrty>"
+        Next i
+
+        ' -- SvcLvl  (col BS) -------------------------------------------------
+        For i = 2 To lastRow
+            Dim svcLvl As String
+            svcLvl = CellStr(ws, i, "F")
+            If Len(svcLvl) > 0 Then
+                .Range("BS" & i).value = "<SvcLvl><Cd>" & svcLvl & "</Cd></SvcLvl>"
+            Else
+                .Range("BS" & i).value = ""
+            End If
+        Next i
+
+        ' -- CtgyPurp  (col BT) -----------------------------------------------
+        For i = 2 To lastRow
+            Dim ctgyPurpCd    As String
+            Dim ctgyPurpPrtry As String
+            ctgyPurpCd = CellStr(ws, i, "G")
+            ctgyPurpPrtry = CellStr(ws, i, "H")
+            If Len(ctgyPurpCd) > 0 Then
+                .Range("BT" & i).value = "<CtgyPurp><Cd>" & ctgyPurpCd & "</Cd></CtgyPurp>"
+            ElseIf Len(ctgyPurpPrtry) > 0 Then
+                .Range("BT" & i).value = "<CtgyPurp><Prtry>" & ctgyPurpPrtry & "</Prtry></CtgyPurp>"
+            Else
+                .Range("BT" & i).value = ""
+            End If
+        Next i
+
+        ' -- ReqdExctnDt  (col BU) --------------------------------------------
+        For i = 2 To lastRow
+            inp = Now() + .Range("I" & i).value
+            dd = Right("00" & Day(inp), 2)
+            mm = Right("00" & Month(inp), 2)
+            yy = CStr(Year(inp))
+            exeDate = yy & "-" & mm & "-" & dd
+            .Range("BU" & i).value = _
+                "</PmtTpInf>" & _
+                "<ReqdExctnDt><Dt>" & exeDate & "</Dt></ReqdExctnDt>"
+        Next i
+
+        ' -- DbtrAcct + DbtrAgt open  (col BW) --------------------------------
+        For i = 2 To lastRow
+            If CellStr(ws, i, "K") = "IBAN" Then
+                .Range("BW" & i).value = _
+                    "<DbtrAcct><Id><IBAN>" & CellStr(ws, i, "L") & "</IBAN></Id>" & _
+                    "<Ccy>" & CellStr(ws, i, "M") & "</Ccy></DbtrAcct>" & _
+                    "<DbtrAgt><FinInstnId>"
+            Else
+                .Range("BW" & i).value = _
+                    "<DbtrAcct><Id><Othr><Id>" & CellStr(ws, i, "L") & "</Id></Othr></Id>" & _
+                    "<Ccy>" & CellStr(ws, i, "M") & "</Ccy></DbtrAcct>" & _
+                    "<DbtrAgt><FinInstnId>"
+            End If
+        Next i
+
+        ' -- DbtrAgt BICFI lookup  (col BX raw, col BY XML) -------------------
+        For i = 2 To lastRow
+            On Error Resume Next
+            .Range("BX" & i).value = Application.WorksheetFunction.VLookup( _
+                ws.Range("J" & i), Myrange, 2, False)
+            On Error GoTo 0
+            .Range("BY" & i).value = _
+                "<BICFI>" & CellStr(ws, i, "BX") & "</BICFI>" & _
+                "</FinInstnId></DbtrAgt>"
+        Next i
+
+        ' -- ChrgBr + CdtTrfTxInf/PmtId open  (col BZ) -----------------------
+        For i = 2 To lastRow
+            .Range("BZ" & i).value = _
+                "<ChrgBr>" & CellStr(ws, i, "N") & "</ChrgBr>" & _
+                "<CdtTrfTxInf><PmtId>"
+        Next i
+
+        ' -- InstrId  (col CA) ------------------------------------------------
+        For i = 2 To lastRow
+            .Range("CA" & i).value = XTag("InstrId", CellStr(ws, i, "O"))
+        Next i
+
+        ' -- EndToEndId  (col CB) ---------------------------------------------
+        For i = 2 To lastRow
+            sta = CellStr(ws, i, "P")
+            If Len(sta) = 0 Then sta = "Eid" & rd1
+            .Range("CB" & i).value = "<EndToEndId>" & sta & "</EndToEndId>"
+        Next i
+
+        ' -- Random fallback for InstdAmt value  ------------------------------
+        For i = 2 To lastRow
+            If IsEmpty(.Range("R" & i).value) Then
+                .Range("R" & i).value = Int(100 + Rnd * 900)
+            End If
+        Next i
+
+        ' -- Amt block  (col CC) ----------------------------------------------
+        For i = 2 To lastRow
+            Dim eqvtAmtVal As String, eqvtAmtCcy As String, ccyOfTrf As String
+            Dim amtBlock As String
+            eqvtAmtVal = CellStr(ws, i, "S")
+            eqvtAmtCcy = CellStr(ws, i, "T")
+            ccyOfTrf = CellStr(ws, i, "U")
+            If Len(eqvtAmtVal) > 0 And Len(eqvtAmtCcy) > 0 And Len(ccyOfTrf) > 0 Then
+                amtBlock = "<Amt><EqvtAmt>" & _
+                           "<Amt Ccy=""" & eqvtAmtCcy & """>" & eqvtAmtVal & "</Amt>" & _
+                           "<CcyOfTrf>" & ccyOfTrf & "</CcyOfTrf>" & _
+                           "</EqvtAmt></Amt>"
+            Else
+                amtBlock = "<Amt><InstdAmt Ccy=""" & CellStr(ws, i, "Q") & """>" & _
+                           CellStr(ws, i, "R") & "</InstdAmt></Amt>"
+            End If
+            .Range("CC" & i).value = "</PmtId>" & amtBlock & "<CdtrAgt>"
+        Next i
+
+        ' -- CdtrAgt FinInstnId + PstlAdr (from BICFI chars 5-6) + Cdtr open  (col CD)
+        ' Country extracted from BICFI positions 5-6 and added to CdtrAgt PstlAdr
+        ' ClrSysId is XSD choice: Cd (col W) OR Prtry (col X) - Cd takes priority.
+        ' MmbId moved to col Y.
+        For i = 2 To lastRow
+            Dim cdtrBicfi   As String, clrSysCd As String, clrSysPrtry As String
+            Dim mmbId As String
+            Dim clrSysBlock As String, finInstnBlock As String
+            cdtrBicfi   = CellStr(ws, i, "V")
+            clrSysCd    = CellStr(ws, i, "W")
+            clrSysPrtry = CellStr(ws, i, "X")   ' NEW: ClrSysId/Prtry
+            mmbId       = CellStr(ws, i, "Y")   ' shifted from X
+
+            cellValue = cdtrBicfi
+            If Len(cellValue) >= 6 Then
+                extracted = Mid(cellValue, 5, 2)
+            Else
+                extracted = ""
+            End If
+
+            ' Build ClrSysId: Cd takes priority over Prtry (XSD choice)
+            Dim clrSysIdBlock As String
+            If Len(clrSysCd) > 0 Then
+                clrSysIdBlock = "<ClrSysId><Cd>" & clrSysCd & "</Cd></ClrSysId>"
+            ElseIf Len(clrSysPrtry) > 0 Then
+                clrSysIdBlock = "<ClrSysId><Prtry>" & clrSysPrtry & "</Prtry></ClrSysId>"
+            Else
+                clrSysIdBlock = ""
+            End If
+
+            ' Build ClrSysMmbId: only emit if MmbId is present
+            If Len(mmbId) > 0 Then
+                clrSysBlock = "<ClrSysMmbId>" & clrSysIdBlock & _
+                              "<MmbId>" & mmbId & "</MmbId>" & _
+                              "</ClrSysMmbId>"
+            Else
+                clrSysBlock = ""
+            End If
+
+            finInstnBlock = "<FinInstnId>"
+            If Len(cdtrBicfi) > 0 Then
+                finInstnBlock = finInstnBlock & "<BICFI>" & cdtrBicfi & "</BICFI>"
+            End If
+
+            finInstnBlock = finInstnBlock & clrSysBlock
+
+            ' CdtrAgt gets PstlAdr with country from BICFI chars 5-6
+            .Range("CD" & i).Value = finInstnBlock & _
+                "<PstlAdr><Ctry>" & extracted & "</Ctry></PstlAdr></FinInstnId></CdtrAgt>" & _
+                "<Cdtr><Nm>Abigail Gerfried</Nm><PstlAdr>"
+        Next i
+
+        ' -- Cdtr address + close  (col CE) -----------------------------------
+        ' Country also from BICFI chars 5-6
+        For i = 2 To lastRow
+            cellValue = CellStr(ws, i, "V")
+            If Len(cellValue) >= 6 Then
+                extracted = Mid(cellValue, 5, 2)
+            Else
+                extracted = ""
+            End If
+            .Range("CE" & i).value = _
+                "<Ctry>" & extracted & "</Ctry>" & _
+                "<AdrLine>Schulstrasse 4</AdrLine>" & _
+                "<AdrLine>32547 Bad Oyenhausen</AdrLine></PstlAdr>" & _
+                "<CtryOfRes>" & extracted & "</CtryOfRes></Cdtr>"
+        Next i
+
+        ' -- CdtrAcct  (col CF) -----------------------------------------------
+        For i = 2 To lastRow
+            If CellStr(ws, i, "Z") = "IBAN" Then
+                .Range("CF" & i).Value = _
+                    "<CdtrAcct><Id><IBAN>" & CellStr(ws, i, "AA") & "</IBAN></Id>" & _
+                    "<Ccy>" & CellStr(ws, i, "Q") & "</Ccy></CdtrAcct>"
+            Else
+                .Range("CF" & i).Value = _
+                    "<CdtrAcct><Id><Othr><Id>" & CellStr(ws, i, "AA") & "</Id></Othr></Id>" & _
+                    "<Ccy>" & CellStr(ws, i, "Q") & "</Ccy></CdtrAcct>"
+            End If
+        Next i
+
+        ' -- Purp  (col CG) ---------------------------------------------------
+        For i = 2 To lastRow
+            Dim purpCd    As String
+            Dim purpPrtry As String
+            purpCd    = CellStr(ws, i, "AB")
+            purpPrtry = CellStr(ws, i, "AC")
+            If Len(purpCd) > 0 Then
+                .Range("CG" & i).Value = "<Purp><Cd>" & purpCd & "</Cd></Purp>"
+            ElseIf Len(purpPrtry) > 0 Then
+                .Range("CG" & i).Value = "<Purp><Prtry>" & purpPrtry & "</Prtry></Purp>"
+            Else
+                .Range("CG" & i).Value = ""
+            End If
+        Next i
+
+        ' -- Bouchons / InstrForCdtrAgt  (col CL) -----------------------------
+        ' Written to CL so it sits between Purp (CG) and RgltryRptg (CH)
+        ' in the xmlCols concatenation order below.
+        ' Suppress if col AJ is non-empty.
+        For i = 2 To lastRow
+            If Len(CellStr(ws, i, "AJ")) = 0 Then
+                .Range("CL" & i).value = _
+                    "<InstrForCdtrAgt><InstrInf>" & _
+                    "SIMUL-FBK//AUTH/OK/AMI000/E0/ SIMUL-FBK//BOOK/OK/AMI000/" & _
+                    "</InstrInf></InstrForCdtrAgt>"
+            Else
+                .Range("CL" & i).value = ""
+            End If
+        Next i
+
+        ' -- RegulatoryReporting  (cols CH, CI) --------------------------------
+        For i = 2 To lastRow
+            rgCd = CellStr(ws, i, "AD")
+            rg1  = CellStr(ws, i, "AE")
+            rg2  = CellStr(ws, i, "AF")
+            rg3  = CellStr(ws, i, "AG")
+            rg4  = CellStr(ws, i, "AH")
+            rg5  = CellStr(ws, i, "AI")
+
+            Dim hasRgltry As Boolean
+            hasRgltry = (Len(rgCd) > 0 Or Len(rg1) > 0 Or Len(rg2) > 0 Or _
+                         Len(rg3) > 0 Or Len(rg4) > 0 Or Len(rg5) > 0)
+            If hasRgltry Then
+                Dim dtlsBlock As String
+                dtlsBlock = "<Dtls>"
+                dtlsBlock = dtlsBlock & XTag("Cd", rgCd)
+                dtlsBlock = dtlsBlock & XTag("Inf", rg1)
+                dtlsBlock = dtlsBlock & XTag("Inf", rg2)
+                dtlsBlock = dtlsBlock & XTag("Inf", rg3)
+                dtlsBlock = dtlsBlock & XTag("Inf", rg4)
+                dtlsBlock = dtlsBlock & XTag("Inf", rg5)
+                dtlsBlock = dtlsBlock & "</Dtls>"
+                .Range("CH" & i).value = "<RgltryRptg>" & dtlsBlock
+                .Range("CI" & i).value = "</RgltryRptg>"
+            Else
+                .Range("CH" & i).value = ""
+                .Range("CI" & i).value = ""
+            End If
+        Next i
+
+        ' -- RmtInf block  (col CJ) -------------------------------------------
+        ' MISTRAL goes into its own <Ustrd>.
+        ' AJ (user free text) goes into a second separate <Ustrd> if populated.
+        ' Channel read from col C; defaults to SFA if empty.
+        For i = 2 To lastRow
+            randomNumber = ""
+            randomNumber1 = ""
+            For j = 1 To 2
+                randomNumber = randomNumber & CStr(Int(10 * Rnd))
+                randomNumber1 = randomNumber1 & CStr(Int(10 * Rnd))
+                randomDigit = Int(10 * Rnd)
+                mi1 = Chr(Int(26 * Rnd + 65))
+                mi2 = Chr(Int(26 * Rnd + 65))
+                mi3 = Chr(Int(26 * Rnd + 65))
+            Next j
+
+            ' Channel from col C (one of the free cols); default SFA
+            Dim channel As String
+            If Len(CellStr(ws, i, "C")) > 0 Then
+                channel = CellStr(ws, i, "C")
+            Else
+                channel = "SFA"
+            End If
+
+            mistralContent = "/MISTRAL_SO//" & mi1 & mi2 & mi3 & headerdt1 & randomNumber & _
+                             "//BULK//" & mi3 & mi1 & mi2 & headerdt1 & _
+                             CStr(randomDigit) & randomNumber1 & "//CHAN//" & channel & "/"
+
+            ' MISTRAL in its own Ustrd; AK in a separate Ustrd if present
+            Dim ustrdBlock As String
+            ustrdBlock = "<Ustrd>" & mistralContent & "</Ustrd>"
+            If Len(CellStr(ws, i, "AK")) > 0 Then
+                ustrdBlock = ustrdBlock & "<Ustrd>" & CellStr(ws, i, "AK") & "</Ustrd>"
+            End If
+
+            ' Structured remittance - AddtlRmtInf lines (cols AM-AQ)
+            Dim s1 As String, s2 As String, s3 As String, s4 As String, s5 As String
+            s1 = CellStr(ws, i, "AM")
+            s2 = CellStr(ws, i, "AN")
+            s3 = CellStr(ws, i, "AO")
+            s4 = CellStr(ws, i, "AP")
+            s5 = CellStr(ws, i, "AQ")
+
+            Dim strdBlock As String
+            strdBlock = ""
+            If Len(s1) > 0 Or Len(s2) > 0 Or Len(s3) > 0 Then
+                strdBlock = strdBlock & "<Strd>" & _
+                            XTag("AddtlRmtInf", s1) & _
+                            XTag("AddtlRmtInf", s2) & _
+                            XTag("AddtlRmtInf", s3) & "</Strd>"
+            End If
+            If Len(s4) > 0 Or Len(s5) > 0 Then
+                strdBlock = strdBlock & "<Strd>" & _
+                            XTag("AddtlRmtInf", s4) & _
+                            XTag("AddtlRmtInf", s5) & "</Strd>"
+            End If
+
+            Dim rmtInfBlock As String
+            rmtInfBlock = ""
+            If Len(mistralContent) > 0 Or Len(strdBlock) > 0 Then
+                rmtInfBlock = "<RmtInf>" & ustrdBlock & strdBlock & "</RmtInf>"
+            End If
+            .Range("CJ" & i).value = rmtInfBlock
+        Next i
+
+        ' -- Concatenate XML fragment columns -> col CM -----------------------
+        ' CL (bouchons/InstrForCdtrAgt) is placed between CG and CH
+        ' so it appears between Purp and RgltryRptg in the XML output.
+        ' CM stores the XML body ONLY - no IPAS header.
+        ' The IPAS header is added fresh per file in Phase 2.
+        Dim xmlCols As Variant
+        xmlCols = Array("BN", "BO", "BP", "BQ", "BR", "BS", "BT", "BU", "BV", _
+                        "BW", "BY", "BZ", "CA", "CB", "CC", "CD", "CE", "CF", _
+                        "CG", "CL", "CH", "CI", "CJ", "CK")
+
+        For i = 2 To lastRow
+            concatenatedString = ""
+            For Each col In xmlCols
+                concatenatedString = concatenatedString & .Cells(i, col).value
+            Next col
+            .Range("CM" & i).value = concatenatedString   ' XML body only
+        Next i
+
+        ' ======================================================================
+        ' PHASE 2: Export - one file per row.
+        '
+        ' BuildIpasHeader() called INSIDE the loop so each file gets:
+        '   - its own current timestamp  (headerdt1, headerdt2)
+        '   - its own random char        (ch)
+        '   - its own milliseconds value
+        '
+        ' Sleep 700ms placed HERE (not in the concat loop where it was before)
+        ' so the delay separates file writes and guarantees unique timestamps.
+        ' ======================================================================
+        Path = "F:\BusinessData\Payment\Shared\2 - PAY Tools\IP\EXPORT\"
+
+        Dim fileNum As Integer
+
+        For i = 2 To lastRow
+            columnData = CellStr(ws, i, "CM")
+            If Len(Trim(columnData)) = 0 Then GoTo NextRow
+
+            Dim pmtRef As String
+            pmtRef = CellStr(ws, i, "B")
+            If Len(pmtRef) = 0 Then pmtRef = "userref" & rd1
+
+            ' File name: J (debtor bank code) + pmtRef + Rand4 + version tag
+            filePath = Path & ws.Range("J" & i).value & "_" & pmtRef & "_" & Rand4() & "_Pain001v9.txt"
+
+            fileNum = FreeFile
+            Open filePath For Output As #fileNum
+            Print #fileNum, BuildIpasHeader(ws, i)   ' fresh unique header for THIS file
+            Print #fileNum, columnData          ' XML body from col CM
+            Close #fileNum
+
+            Sleep 700   ' 700ms between files - ensures unique timestamp in each header
+
+NextRow:
+        Next i
+
+        ' ======================================================================
+        ' Clear WORK columns (preserves row 1 headers and input data)
+        ' Input clear left commented out as per user's version
+        ' ======================================================================
+        ' .Range("B2:AP5000").ClearContents
+        .Range("BN2:CM5000").ClearContents
+
+    End With
+
+    MsgBox " Export completed "
+
+End Sub
+
+
+
