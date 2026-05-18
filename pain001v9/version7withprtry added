@@ -220,7 +220,7 @@ Private Function BuildIpasHeader(ws As Worksheet, row As Long) As String
 
     ' Read col D for the clearing house code; compare as string literals
     Dim dVal As String
-    dVal = Trim(CStr(ws.Cells(row, "D").Value))
+    dVal = Trim(CStr(ws.Cells(row, "D").value))
 
     If Len(dVal) = 0 Then
         GCHcheck = "IF01IPASGCH             PAIN001"   ' default when cell is empty
@@ -244,7 +244,7 @@ End Function
 ' ==============================================================================
 ' Main export
 ' ==============================================================================
-Sub DEEEEExportPain1V9()
+Sub XXEExportPain1V9()
 
     ' --------------------------------------------------------------------------
     ' Worksheet references
@@ -365,7 +365,7 @@ Sub DEEEEExportPain1V9()
         ' -- PmtInfId + PmtMtd + BtchBookg + NbOfTxs + CtrlSum  (col BQ) -----
         ' PmtInfId = user value (col B) + rd1 + milliseconds for uniqueness
         For i = 2 To lastRow
-            ref = CellStr(ws, i, "B") & rd1 & milliseconds
+            ref = CellStr(ws, i, "B") & rd1 & milliseconds & rd1
             If Len(CellStr(ws, i, "B")) = 0 Then ref = "userref" & rd1 & milliseconds
             .Range("BQ" & i).value = _
                 "<PmtInfId>" & ref & "</PmtInfId>" & _
@@ -500,10 +500,10 @@ Sub DEEEEExportPain1V9()
             Dim cdtrBicfi   As String, clrSysCd As String, clrSysPrtry As String
             Dim mmbId As String
             Dim clrSysBlock As String, finInstnBlock As String
-            cdtrBicfi   = CellStr(ws, i, "V")
-            clrSysCd    = CellStr(ws, i, "W")
+            cdtrBicfi = CellStr(ws, i, "V")
+            clrSysCd = CellStr(ws, i, "W")
             clrSysPrtry = CellStr(ws, i, "X")   ' NEW: ClrSysId/Prtry
-            mmbId       = CellStr(ws, i, "Y")   ' shifted from X
+            mmbId = CellStr(ws, i, "Y")         ' shifted from X
 
             cellValue = cdtrBicfi
             If Len(cellValue) >= 6 Then
@@ -539,7 +539,7 @@ Sub DEEEEExportPain1V9()
             finInstnBlock = finInstnBlock & clrSysBlock
 
             ' CdtrAgt gets PstlAdr with country from BICFI chars 5-6
-            .Range("CD" & i).Value = finInstnBlock & _
+            .Range("CD" & i).value = finInstnBlock & _
                 "<PstlAdr><Ctry>" & extracted & "</Ctry></PstlAdr></FinInstnId></CdtrAgt>" & _
                 "<Cdtr><Nm>Abigail Gerfried</Nm><PstlAdr>"
         Next i
@@ -563,11 +563,11 @@ Sub DEEEEExportPain1V9()
         ' -- CdtrAcct  (col CF) -----------------------------------------------
         For i = 2 To lastRow
             If CellStr(ws, i, "Z") = "IBAN" Then
-                .Range("CF" & i).Value = _
+                .Range("CF" & i).value = _
                     "<CdtrAcct><Id><IBAN>" & CellStr(ws, i, "AA") & "</IBAN></Id>" & _
                     "<Ccy>" & CellStr(ws, i, "Q") & "</Ccy></CdtrAcct>"
             Else
-                .Range("CF" & i).Value = _
+                .Range("CF" & i).value = _
                     "<CdtrAcct><Id><Othr><Id>" & CellStr(ws, i, "AA") & "</Id></Othr></Id>" & _
                     "<Ccy>" & CellStr(ws, i, "Q") & "</Ccy></CdtrAcct>"
             End If
@@ -577,14 +577,14 @@ Sub DEEEEExportPain1V9()
         For i = 2 To lastRow
             Dim purpCd    As String
             Dim purpPrtry As String
-            purpCd    = CellStr(ws, i, "AB")
+            purpCd = CellStr(ws, i, "AB")
             purpPrtry = CellStr(ws, i, "AC")
             If Len(purpCd) > 0 Then
-                .Range("CG" & i).Value = "<Purp><Cd>" & purpCd & "</Cd></Purp>"
+                .Range("CG" & i).value = "<Purp><Cd>" & purpCd & "</Cd></Purp>"
             ElseIf Len(purpPrtry) > 0 Then
-                .Range("CG" & i).Value = "<Purp><Prtry>" & purpPrtry & "</Prtry></Purp>"
+                .Range("CG" & i).value = "<Purp><Prtry>" & purpPrtry & "</Prtry></Purp>"
             Else
-                .Range("CG" & i).Value = ""
+                .Range("CG" & i).value = ""
             End If
         Next i
 
@@ -606,11 +606,11 @@ Sub DEEEEExportPain1V9()
         ' -- RegulatoryReporting  (cols CH, CI) --------------------------------
         For i = 2 To lastRow
             rgCd = CellStr(ws, i, "AD")
-            rg1  = CellStr(ws, i, "AE")
-            rg2  = CellStr(ws, i, "AF")
-            rg3  = CellStr(ws, i, "AG")
-            rg4  = CellStr(ws, i, "AH")
-            rg5  = CellStr(ws, i, "AI")
+            rg1 = CellStr(ws, i, "AE")
+            rg2 = CellStr(ws, i, "AF")
+            rg3 = CellStr(ws, i, "AG")
+            rg4 = CellStr(ws, i, "AH")
+            rg5 = CellStr(ws, i, "AI")
 
             Dim hasRgltry As Boolean
             hasRgltry = (Len(rgCd) > 0 Or Len(rg1) > 0 Or Len(rg2) > 0 Or _
@@ -727,7 +727,7 @@ Sub DEEEEExportPain1V9()
         ' Sleep 700ms placed HERE (not in the concat loop where it was before)
         ' so the delay separates file writes and guarantees unique timestamps.
         ' ======================================================================
-        Path = "F:\BusinessData\Payment\Shared\2 - PAY Tools\IP\EXPORT\"
+        Path = "Y:\_ApplicationData\EUFTtransfer-EUFT\se-SCB-IPAS\Input\"
 
         Dim fileNum As Integer
 
@@ -765,6 +765,8 @@ NextRow:
     MsgBox " Export completed "
 
 End Sub
+
+
 
 
 
