@@ -1,0 +1,195 @@
+# BulkV9 — How to Enter Input in Excel (3-Child Example)
+
+## The Golden Rule
+
+> **All rows that share the exact same value in column B are grouped into ONE output file.**
+> Each row in the group becomes one `<CdtTrfTxInf>` child inside that file's single `<PmtInf>`.
+
+---
+
+## Concrete Example: 3 children → 1 file
+
+You enter **3 rows** in the `XIPfill` sheet (e.g. rows 2, 3, 4) all with the **same col B value**.
+
+| Row | B (Group key / PmtInfId seed) | … | All other cols |
+|-----|-------------------------------|---|----------------|
+| 2   | `PAYREF001`                   |   | child 1 data   |
+| 3   | `PAYREF001`                   |   | child 2 data   |
+| 4   | `PAYREF001`                   |   | child 3 data   |
+
+→ Produces **one file**: `BARCGB22_PAYREF001_XXXX_BulkPain001v9.txt`  
+→ That file contains **one PmtInf** with **three `<CdtTrfTxInf>` blocks**
+
+---
+
+## Column-by-Column: What to Put Where
+
+### 🔵 PmtInf-level columns — taken from the FIRST row of the group only
+> (Rows 3 and 4 values in these cols are **ignored** by the macro)
+
+| Col | Field | Example |
+|-----|-------|---------|
+| **B** | PmtInfId seed **AND** group key | `PAYREF001` |
+| **C** | MISTRAL channel override | `SFA` (or leave blank → defaults to SFA) |
+| **D** | Clearing house: `GCH` / `EMX` / `ITL` | `GCH` (or blank → GCH) |
+| **E** | InstrPrty | `NORM` or `HIGH` |
+| **F** | SvcLvl/Cd | `SDVA` (or blank to omit) |
+| **G** | CtgyPurp/Cd | `SUPP` (or blank) |
+| **H** | CtgyPurp/Prtry | (used only if G blank) |
+| **I** | ReqdExctnDt offset (days from today) | `0` = today, `1` = tomorrow |
+| **J** | Debtor bank code (BIC lookup key) | `BARCGB22` |
+| **K** | Debtor account type | `IBAN` or `other` |
+| **L** | Debtor account number | `GB29NWBK60161331926819` |
+| **M** | Debtor account currency | `GBP` |
+| **N** | ChrgBr | `SLEV` |
+
+---
+
+### 🟢 Per-child columns — each row has its OWN values (all 3 rows are used)
+> (These become the `<CdtTrfTxInf>` content for that specific child)
+
+| Col | Field | Child 1 (row 2) | Child 2 (row 3) | Child 3 (row 4) |
+|-----|-------|-----------------|-----------------|-----------------|
+| **O** | InstrId | `INSTR001` | `INSTR002` | `INSTR003` |
+| **P** | EndToEndId | `E2E-001` | `E2E-002` | `E2E-003` |
+| **Q** | InstdAmt Ccy | `EUR` | `EUR` | `GBP` |
+| **R** | InstdAmt value | `100.00` | `150.00` | `50.00` |
+| **S** | EqvtAmt value | *(blank → use InstdAmt)* | *(blank)* | *(blank)* |
+| **T** | EqvtAmt Ccy | *(blank)* | *(blank)* | *(blank)* |
+| **U** | EqvtAmt CcyOfTrf | *(blank)* | *(blank)* | *(blank)* |
+| **V** | CdtrAgt BICFI | `DEUTDEDB` | `BNPAFRPP` | `BARCGB22` |
+| **W** | ClrSysMmbId/Cd | *(blank)* | `CHAPS` | *(blank)* |
+| **X** | ClrSysMmbId/Prtry | *(blank)* | *(blank)* | *(blank)* |
+| **Y** | ClrSysMmbId/MmbId | *(blank)* | `123456` | *(blank)* |
+| **Z** | Creditor account type | `IBAN` | `IBAN` | `other` |
+| **AA** | Creditor account number | `DE89370400440532013000` | `FR7614508059405051697940B33` | `ACC999` |
+| **AB** | Purp/Cd | `SUPP` | *(blank)* | `SALA` |
+| **AC** | Purp/Prtry | *(blank)* | `TRADE` | *(blank)* |
+| **AD** | RgltryRptg/Dtls/Cd | *(blank)* | *(blank)* | *(blank)* |
+| **AE–AI** | RgltryRptg/Inf lines 1–5 | *(blank)* | *(blank)* | *(blank)* |
+| **AJ** | Suppress bouchons flag | *(blank = show bouchons)* | *(blank)* | `X` = suppress |
+| **AK** | RmtInf/Ustrd user text | `Invoice 1001` | `Invoice 1002` | *(blank)* |
+| **AM–AQ** | Strd/AddtlRmtInf lines 1–5 | *(blank)* | *(blank)* | *(blank)* |
+
+> **CtrlSum** is auto-computed: `100.00 + 150.00 + 50.00 = 300.00`  
+> **NbOfTxs** is auto-computed: `3`
+
+---
+
+## What the macro produces — XML skeleton
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.09">
+  <CstmrCdtTrfInitn>
+
+    <GrpHdr>
+      <MsgId>PAYREF001XXXXXXXXXXXX</MsgId>
+      <CreDtTm>2026-05-21T00:00:00</CreDtTm>
+      <NbOfTxs>3</NbOfTxs>              <!-- computed from group -->
+      <CtrlSum>300.00</CtrlSum>         <!-- sum of R col (or S if EqvtAmt) -->
+      <InitgPty><Nm>BNP client</Nm></InitgPty>
+    </GrpHdr>
+
+    <PmtInf>
+      <!-- ── PmtInf-level: from FIRST row (row 2) ───────────────── -->
+      <PmtInfId>PAYREF001...</PmtInfId>
+      <PmtMtd>TRF</PmtMtd>
+      <BtchBookg>true</BtchBookg>
+      <NbOfTxs>3</NbOfTxs>
+      <CtrlSum>300.00</CtrlSum>
+      <PmtTpInf><InstrPrty>NORM</InstrPrty></PmtTpInf>
+      <ReqdExctnDt><Dt>2026-05-21</Dt></ReqdExctnDt>
+      <Dbtr>...</Dbtr>
+      <DbtrAcct>...</DbtrAcct>
+      <DbtrAgt>...</DbtrAgt>
+      <ChrgBr>SLEV</ChrgBr>
+
+      <!-- ── Child 1: from row 2 ─────────────────────────────────── -->
+      <CdtTrfTxInf>
+        <PmtId>
+          <InstrId>INSTR001</InstrId>
+          <EndToEndId>E2E-001</EndToEndId>
+        </PmtId>
+        <Amt><InstdAmt Ccy="EUR">100.00</InstdAmt></Amt>
+        <CdtrAgt>...</CdtrAgt>           <!-- DEUTDEDB -->
+        <Cdtr>...</Cdtr>
+        <CdtrAcct>...</CdtrAcct>         <!-- DE89... -->
+        <Purp><Cd>SUPP</Cd></Purp>
+        <InstrForCdtrAgt>...bouchons...</InstrForCdtrAgt>
+        <RmtInf><Ustrd>/MISTRAL.../</Ustrd><Ustrd>Invoice 1001</Ustrd></RmtInf>
+      </CdtTrfTxInf>
+
+      <!-- ── Child 2: from row 3 ─────────────────────────────────── -->
+      <CdtTrfTxInf>
+        <PmtId>
+          <InstrId>INSTR002</InstrId>
+          <EndToEndId>E2E-002</EndToEndId>
+        </PmtId>
+        <Amt><InstdAmt Ccy="EUR">150.00</InstdAmt></Amt>
+        <CdtrAgt>                        <!-- BNPAFRPP + CHAPS MmbId -->
+          <FinInstnId>
+            <BICFI>BNPAFRPP</BICFI>
+            <ClrSysMmbId>
+              <ClrSysId><Cd>CHAPS</Cd></ClrSysId>
+              <MmbId>123456</MmbId>
+            </ClrSysMmbId>
+          </FinInstnId>
+        </CdtrAgt>
+        <Cdtr>...</Cdtr>
+        <CdtrAcct>...</CdtrAcct>         <!-- FR76... -->
+        <Purp><Prtry>TRADE</Prtry></Purp>
+        <InstrForCdtrAgt>...bouchons...</InstrForCdtrAgt>
+        <RmtInf><Ustrd>/MISTRAL.../</Ustrd><Ustrd>Invoice 1002</Ustrd></RmtInf>
+      </CdtTrfTxInf>
+
+      <!-- ── Child 3: from row 4 ─────────────────────────────────── -->
+      <CdtTrfTxInf>
+        <PmtId>
+          <InstrId>INSTR003</InstrId>
+          <EndToEndId>E2E-003</EndToEndId>
+        </PmtId>
+        <Amt><InstdAmt Ccy="GBP">50.00</InstdAmt></Amt>
+        <CdtrAgt>...</CdtrAgt>           <!-- BARCGB22 -->
+        <Cdtr>...</Cdtr>
+        <CdtrAcct>                       <!-- Othr (not IBAN) -->
+          <Id><Othr><Id>ACC999</Id></Othr></Id>
+        </CdtrAcct>
+        <Purp><Cd>SALA</Cd></Purp>
+        <!-- No bouchons: col AJ = "X" suppressed them -->
+        <RmtInf><Ustrd>/MISTRAL.../</Ustrd></RmtInf>
+      </CdtTrfTxInf>
+
+    </PmtInf>
+  </CstmrCdtTrfInitn>
+</Document>
+```
+
+---
+
+## Multiple groups in the same sheet
+
+You can process **several groups in one run** — just use different col B values for each group:
+
+| Row | B            | Purpose         |
+|-----|--------------|-----------------|
+| 2   | `PAYREF001`  | Group 1, child 1 |
+| 3   | `PAYREF001`  | Group 1, child 2 |
+| 4   | `PAYREF001`  | Group 1, child 3 |
+| 5   | `PAYREF002`  | Group 2, child 1 |
+| 6   | `PAYREF002`  | Group 2, child 2 |
+| 7   | `PAYREF003`  | Group 3, child 1 (single-child bulk) |
+
+→ Produces **3 separate files**:
+- `..._PAYREF001_..._BulkPain001v9.txt`  (3 children)
+- `..._PAYREF002_..._BulkPain001v9.txt`  (2 children)
+- `..._PAYREF003_..._BulkPain001v9.txt`  (1 child)
+
+> [!IMPORTANT]
+> The rows in a group do **not** need to be consecutive — the macro scans all rows for matching col B values. However, keeping them consecutive is strongly recommended for readability.
+
+> [!NOTE]
+> PmtInf-level fields (cols B, C, D, E, F, G, H, I, J, K, L, M, N) only need to be filled on the **first row** of each group. The macro ignores those columns in rows 2 and 3 of the group. You can leave them blank or copy the values — it makes no difference.
+
+> [!TIP]
+> Each child can have **completely independent** creditor details, amounts, currencies, purpose codes, regulatory reporting, and remittance info — they just share the same debtor/PmtInf wrapper.
