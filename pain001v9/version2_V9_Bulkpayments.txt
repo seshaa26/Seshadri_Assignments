@@ -1,0 +1,742 @@
+Attribute VB_Name = "BulkV9"
+' ==============================================================================
+' pain.001.001.09  -  BULK Customer Credit Transfer Initiation Export
+' CGI-MP V09  |  ISO 20022
+'
+' KEY DIFFERENCES vs ExportPain1V9_XSDOrder (single-transaction version):
+'   1. <BtchBookg>true</BtchBookg>
+'   2. Rows sharing the same col B value are grouped into ONE PmtInf / ONE file
+'   3. Each row in a group becomes one <CdtTrfTxInf> child block
+'      (typical: 2-3 children, no hard limit)
+'   4. GrpHdr NbOfTxs + CtrlSum  AND  PmtInf NbOfTxs + CtrlSum are computed
+'      from the group at assembly time  (NOT hardcoded)
+'   5. ChrgBr (PmtInf level) is taken from the FIRST row of each group
+'
+' GROUPING RULE:
+'   All rows whose col B value is identical are treated as one group.
+'   Typical use: 2-3 consecutive rows sharing the same PmtInfId prefix in col B.
+'   One output file is produced per unique col B value.
+'
+' INPUT COLUMNS: identical to ExportPain1V9_XSDOrder (cols B through AQ).
+'   Col B is both the PmtInfId seed AND the group key.
+'
+' ==============================================================================
+' WORK COLUMNS  BN : CN  (BN:CM reused from original; CN is new)
+'
+'  +------+-------------------------------------------------------------------+
+'  |  BN  | XML decl + GrpHdr open + MsgId + <CreDtTm>  (per row)           |
+'  |  BO  | CreDtTm date (YYYY-MM-DD)                    (per row)           |
+'  |  BQ  | Raw PmtInfId ref string  (assembled in Phase 2; no XML wrap)     |
+'  |  BR  | <PmtTpInf><InstrPrty>...</InstrPrty>         (PmtInf level)      |
+'  |  BS  | SvcLvl XML  (or "")                          (PmtInf level)      |
+'  |  BT  | CtgyPurp XML  (or "")                        (PmtInf level)      |
+'  |  BU  | </PmtTpInf><ReqdExctnDt>...                  (PmtInf level)      |
+'  |  BV  | Static Debtor block                           (PmtInf level)      |
+'  |  BW  | DbtrAcct + DbtrAgt open                       (PmtInf level)      |
+'  |  BX  | BICFI raw lookup (intermediate)                                   |
+'  |  BY  | <BICFI>...</BICFI></FinInstnId></DbtrAgt>     (PmtInf level)      |
+'  |  BZ  | <ChrgBr>...</ChrgBr>  ONLY  (PmtInf level; first row of group)  |
+'  |  CA  | <InstrId>...</InstrId>  or ""            \                        |
+'  |  CB  | <EndToEndId>...</EndToEndId>              |                       |
+'  |  CC  | </PmtId> + Amt block + <CdtrAgt>          |  per-row child cols   |
+'  |  CD  | CdtrAgt FinInstnId + Cdtr open            |                       |
+'  |  CE  | Cdtr address + close                      |                       |
+'  |  CF  | CdtrAcct                                  |                       |
+'  |  CG  | Purp XML  (or "")                         |                       |
+'  |  CL  | InstrForCdtrAgt bouchons  (or "")         |                       |
+'  |  CH  | RgltryRptg open + Dtls block              |                       |
+'  |  CI  | </RgltryRptg>  (or "")                    |                       |
+'  |  CJ  | RmtInf block                              |                       |
+'  |  CK  | </CdtTrfTxInf>                           /                       |
+'  |  CN  | COMPLETE per-row CdtTrfTxInf fragment:                           |
+'  |      |   <CdtTrfTxInf><PmtId> + CA+CB+CC+CD+CE+CF+CG+CL+CH+CI+CJ+CK  |
+'  +------+-------------------------------------------------------------------+
+'
+'  Phase 2 assembles each group as:
+'    IPAS header  (fresh per file via BV9_BuildIpasHeader)
+'    BN(fr) + BO(fr) + T00:00:00 + NbOfTxs + CtrlSum + InitgPty + </GrpHdr>
+'    <PmtInf> + PmtInfId + PmtMtd + BtchBookg=true + NbOfTxs + CtrlSum
+'    + BR(fr)+BS(fr)+BT(fr)+BU(fr)+BV(fr)+BW(fr)+BY(fr)+BZ(fr)
+'    + CN(row1) + CN(row2) + ... + CN(rowN)
+'    + </PmtInf></CstmrCdtTrfInitn></Document>
+'
+'  OUTPUT FILE NAME: {J of first row}_{groupKey}_{Rand4}_BulkPain001v9.txt
+' ==============================================================================
+
+Option Explicit
+
+' Windows API for millisecond sleep
+#If VBA7 Then
+    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+#Else
+    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+#End If
+
+' ==============================================================================
+' Private helpers  (BV9_ prefix avoids name collision with other modules)
+' ==============================================================================
+
+Private Function BV9_CellStr(ws As Worksheet, Row As Long, col As String) As String
+    Dim v As Variant
+    v = ws.Range(col & Row).Value
+    If IsEmpty(v) Or IsNull(v) Then
+        BV9_CellStr = ""
+    Else
+        BV9_CellStr = Trim(CStr(v))
+    End If
+End Function
+
+Private Function BV9_XTag(tag As String, val As String) As String
+    If Len(val) = 0 Then
+        BV9_XTag = ""
+    Else
+        BV9_XTag = "<" & tag & ">" & val & "</" & tag & ">"
+    End If
+End Function
+
+Private Function BV9_UniqueId12() As String
+    Dim chars As String, result As String, k As Integer
+    chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    result = ""
+    For k = 1 To 12
+        result = result & Mid(chars, Int(36 * Rnd) + 1, 1)
+    Next k
+    BV9_UniqueId12 = result
+End Function
+
+Private Function BV9_Rand4() As String
+    Dim chars As String, result As String, k As Integer
+    chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    result = ""
+    For k = 1 To 4
+        result = result & Mid(chars, Int(36 * Rnd) + 1, 1)
+    Next k
+    BV9_Rand4 = result
+End Function
+
+' ------------------------------------------------------------------------------
+' Build a fresh IPAS header on every call (same logic as BuildIpasHeader in
+' ExportPain1V9_XSDOrder; capturing Now() + Timer at call time ensures each
+' output file gets its own unique timestamp, random char and milliseconds).
+' ------------------------------------------------------------------------------
+Private Function BV9_BuildIpasHeader(ws As Worksheet, Row As Long) As String
+    Dim ts As Variant
+    Dim dd As String, mm As String, yy As String, yy2 As String
+    Dim hh As String, nn As String, ss As String
+    Dim hdt1 As String, hdt2 As String, ch As String
+    Dim ms As String, GCH As String, dVal As String
+
+    ts = Now()
+    dd = Right("00" & Day(ts), 2)
+    mm = Right("00" & Month(ts), 2)
+    yy = CStr(Year(ts))
+    yy2 = Right("00" & Year(ts), 2)
+    hh = Right("00" & Hour(ts), 2)
+    nn = Right("00" & Minute(ts), 2)
+    ss = Right("00" & Second(ts), 2)
+
+    hdt1 = yy2 & mm & dd & hh & nn & ss   ' 12-char short timestamp
+    hdt2 = yy & mm & dd & hh & nn & ss    ' 14-char long  timestamp
+    ch   = Chr(Int(26 * Rnd + 65))         ' random A-Z
+    ms   = CStr(CLng(Timer * 1000) Mod 1000)
+
+    dVal = Trim(CStr(ws.Cells(Row, "D").Value))
+    Select Case dVal
+        Case "EMX": GCH = "IF01EMX                 PAIN001"
+        Case "ITL": GCH = "IF01ITL                 SCBCTCB"
+        Case Else:  GCH = "IF01IPASGCH             PAIN001"
+    End Select
+
+    BV9_BuildIpasHeader = GCH & " PHXIPP" & _
+                          hdt1 & ch & ms & Space(20) & hdt2 & _
+                          "INPUT                                   00000000" & _
+                          "                    00000000" & _
+                          "                    00000000" & Space(110)
+End Function
+
+' ==============================================================================
+Sub ExportBulkV9()
+' ==============================================================================
+
+    ' --------------------------------------------------------------------------
+    ' Worksheet references
+    ' --------------------------------------------------------------------------
+    Dim ws  As Worksheet
+    Dim ws1 As Worksheet
+    Set ws  = ThisWorkbook.Sheets("XIPfill")
+    Set ws1 = ThisWorkbook.Sheets("BIClist")
+
+    Dim lastRow As Long
+    lastRow = ws.Cells(ws.Rows.Count, "B").End(xlUp).Row
+
+    If lastRow < 2 Then
+        MsgBox "No data rows found (col B is empty)."
+        Exit Sub
+    End If
+
+    ' --------------------------------------------------------------------------
+    ' Shared timestamp for CreDtTm and MISTRAL reference
+    ' (NOT used for IPAS header – BV9_BuildIpasHeader handles that per file)
+    ' --------------------------------------------------------------------------
+    Dim dtsnow As Variant
+    Dim dd As String, mm As String, yy As String, yy2 As String
+    Dim hh As String, nn As String, ss As String
+    Dim createdt As String, headerdt1 As String, milliseconds As String
+
+    dtsnow = Now()
+    dd  = Right("00" & Day(dtsnow), 2)
+    mm  = Right("00" & Month(dtsnow), 2)
+    yy  = CStr(Year(dtsnow))
+    yy2 = Right("00" & Year(dtsnow), 2)
+    hh  = Right("00" & Hour(dtsnow), 2)
+    nn  = Right("00" & Minute(dtsnow), 2)
+    ss  = Right("00" & Second(dtsnow), 2)
+
+    createdt  = yy & "-" & mm & "-" & dd
+    headerdt1 = yy2 & mm & dd & hh & nn & ss
+    milliseconds = CStr(CLng(Timer * 1000) Mod 1000)
+
+    ' --------------------------------------------------------------------------
+    ' Seed for PmtInfId / EndToEndId fallbacks
+    ' --------------------------------------------------------------------------
+    Dim rd1 As Integer
+    rd1 = Int(100 + Rnd * 900)
+
+    ' --------------------------------------------------------------------------
+    ' BIC lookup range (col J -> BIClist A:B)
+    ' --------------------------------------------------------------------------
+    Dim Myrange As Variant
+    Set Myrange = ws1.Range("A:B")
+
+    ' --------------------------------------------------------------------------
+    ' All working variables declared at Sub level (avoids double-Dim in loops)
+    ' --------------------------------------------------------------------------
+
+    ' Loop counters / iterators
+    Dim i As Long, j As Long, k As Long, r As Long
+    Dim col As Variant
+
+    ' Phase 1 – fragment building
+    Dim refStr       As String
+    Dim instrPrty    As String
+    Dim svcLvl       As String
+    Dim ctgyPurpCd   As String, ctgyPurpPrtry As String
+    Dim inp          As Variant, exeDate As String
+    Dim sta          As String
+    Dim eqvtAmtVal   As String, eqvtAmtCcy As String, ccyOfTrf As String
+    Dim amtBlock     As String
+    Dim cdtrBicfi    As String, clrSysCd As String, clrSysPrtry As String
+    Dim mmbId        As String, clrSysIdBlock As String
+    Dim clrSysBlock  As String, finInstnBlock As String, extracted As String
+    Dim extr2        As String
+    Dim purpCd       As String, purpPrtry As String
+    Dim hasRgltry    As Boolean, dtlsBlock As String
+    Dim rgCd         As String
+    Dim rg1          As String, rg2 As String, rg3 As String
+    Dim rg4          As String, rg5 As String
+    Dim randomNumber  As String, randomNumber1 As String
+    Dim randomDigit   As Integer
+    Dim mi1 As String, mi2 As String, mi3 As String
+    Dim channel      As String, mistralContent As String
+    Dim ustrdBlock   As String, strdBlock As String, rmtInfBlock As String
+    Dim s1 As String, s2 As String, s3 As String, s4 As String, s5 As String
+    Dim txCols       As Variant, txFrag As String
+
+    ' Phase 2 – grouping and assembly
+    Dim processed()      As Boolean
+    Dim groupKey         As String
+    Dim groupRows()      As Long
+    Dim groupCount       As Long
+    Dim rowIdx           As Long
+    Dim eqvtVal          As String
+    Dim ctrlSum          As Double
+    Dim ctrlSumStr       As String
+    Dim fr               As Long      ' first row index of current group
+    Dim grpHdrBlock      As String
+    Dim pmtInfOpenBlock  As String
+    Dim txBlocks         As String
+    Dim fullXML          As String
+    Dim filePath         As String
+    Dim fileNum          As Integer
+    Dim OutputPath       As String
+
+    ReDim processed(1 To lastRow)
+
+    With ws
+
+        ' ======================================================================
+        ' PHASE 1: Build XML fragment columns  (rows 2 to lastRow)
+        ' ======================================================================
+
+        ' -- BN : XML decl + GrpHdr open + MsgId + <CreDtTm> -----------------
+        ' -- BO : CreDtTm date part  (YYYY-MM-DD) ----------------------------
+        For i = 2 To lastRow
+            .Range("BN" & i).Value = _
+                "<?xml version=""1.0"" encoding=""UTF-8""?>" & _
+                "<Document xmlns=""urn:iso:std:iso:20022:tech:xsd:pain.001.001.09"">" & _
+                "<CstmrCdtTrfInitn><GrpHdr>" & _
+                "<MsgId>" & BV9_CellStr(ws, i, "B") & BV9_UniqueId12() & "</MsgId>" & _
+                "<CreDtTm>"
+            .Range("BO" & i).Value = createdt
+        Next i
+
+        ' -- BQ : raw PmtInfId reference string (XML wrapper added in Phase 2) -
+        For i = 2 To lastRow
+            refStr = BV9_CellStr(ws, i, "B") & rd1 & milliseconds & rd1
+            If Len(BV9_CellStr(ws, i, "B")) = 0 Then refStr = "userref" & rd1 & milliseconds
+            .Range("BQ" & i).Value = refStr
+        Next i
+
+        ' -- BR : PmtTpInf open + InstrPrty  (PmtInf level) ------------------
+        For i = 2 To lastRow
+            instrPrty = UCase(BV9_CellStr(ws, i, "E"))
+            If instrPrty <> "HIGH" And instrPrty <> "NORM" Then instrPrty = "NORM"
+            .Range("BR" & i).Value = "<PmtTpInf><InstrPrty>" & instrPrty & "</InstrPrty>"
+        Next i
+
+        ' -- BS : SvcLvl  (PmtInf level) -------------------------------------
+        For i = 2 To lastRow
+            svcLvl = BV9_CellStr(ws, i, "F")
+            If Len(svcLvl) > 0 Then
+                .Range("BS" & i).Value = "<SvcLvl><Cd>" & svcLvl & "</Cd></SvcLvl>"
+            Else
+                .Range("BS" & i).Value = ""
+            End If
+        Next i
+
+        ' -- BT : CtgyPurp  (PmtInf level) -----------------------------------
+        For i = 2 To lastRow
+            ctgyPurpCd    = BV9_CellStr(ws, i, "G")
+            ctgyPurpPrtry = BV9_CellStr(ws, i, "H")
+            If Len(ctgyPurpCd) > 0 Then
+                .Range("BT" & i).Value = "<CtgyPurp><Cd>" & ctgyPurpCd & "</Cd></CtgyPurp>"
+            ElseIf Len(ctgyPurpPrtry) > 0 Then
+                .Range("BT" & i).Value = "<CtgyPurp><Prtry>" & ctgyPurpPrtry & "</Prtry></CtgyPurp>"
+            Else
+                .Range("BT" & i).Value = ""
+            End If
+        Next i
+
+        ' -- BU : close PmtTpInf + ReqdExctnDt  (PmtInf level) ---------------
+        For i = 2 To lastRow
+            inp = Now() + .Range("I" & i).Value
+            dd      = Right("00" & Day(inp), 2)
+            mm      = Right("00" & Month(inp), 2)
+            yy      = CStr(Year(inp))
+            exeDate = yy & "-" & mm & "-" & dd
+            .Range("BU" & i).Value = _
+                "</PmtTpInf><ReqdExctnDt><Dt>" & exeDate & "</Dt></ReqdExctnDt>"
+        Next i
+
+        ' -- BV : static Debtor block  (PmtInf level) -------------------------
+        For i = 2 To lastRow
+            .Range("BV" & i).Value = _
+                "<Dbtr><Nm>KVERNELAND AS</Nm>" & _
+                "<PstlAdr><Ctry>GB</Ctry>" & _
+                "<AdrLine>PLOGFABRIKKVEGEN 1</AdrLine>" & _
+                "<AdrLine>4353 KLEPP ST.</AdrLine></PstlAdr>" & _
+                "<CtryOfRes>GB</CtryOfRes></Dbtr>"
+        Next i
+
+        ' -- BW : DbtrAcct + DbtrAgt open  (PmtInf level) --------------------
+        For i = 2 To lastRow
+            If BV9_CellStr(ws, i, "K") = "IBAN" Then
+                .Range("BW" & i).Value = _
+                    "<DbtrAcct><Id><IBAN>" & BV9_CellStr(ws, i, "L") & "</IBAN></Id>" & _
+                    "<Ccy>" & BV9_CellStr(ws, i, "M") & "</Ccy></DbtrAcct>" & _
+                    "<DbtrAgt><FinInstnId>"
+            Else
+                .Range("BW" & i).Value = _
+                    "<DbtrAcct><Id><Othr><Id>" & BV9_CellStr(ws, i, "L") & "</Id></Othr></Id>" & _
+                    "<Ccy>" & BV9_CellStr(ws, i, "M") & "</Ccy></DbtrAcct>" & _
+                    "<DbtrAgt><FinInstnId>"
+            End If
+        Next i
+
+        ' -- BX / BY : DbtrAgt BICFI lookup  (PmtInf level) ------------------
+        For i = 2 To lastRow
+            On Error Resume Next
+            .Range("BX" & i).Value = Application.WorksheetFunction.VLookup( _
+                ws.Range("J" & i), Myrange, 2, False)
+            On Error GoTo 0
+            .Range("BY" & i).Value = _
+                "<BICFI>" & BV9_CellStr(ws, i, "BX") & "</BICFI>" & _
+                "</FinInstnId></DbtrAgt>"
+        Next i
+
+        ' -- BZ : ChrgBr ONLY  (PmtInf level; taken from first row in Phase 2)
+        '         NOTE: in single-tx version BZ also opened <CdtTrfTxInf><PmtId>.
+        '         In bulk that opening lives in CN so it repeats per child.
+        For i = 2 To lastRow
+            .Range("BZ" & i).Value = "<ChrgBr>" & BV9_CellStr(ws, i, "N") & "</ChrgBr>"
+        Next i
+
+        ' ======================================================================
+        ' Per-transaction (child) columns  CA through CK
+        ' Each row becomes one complete <CdtTrfTxInf> block via col CN.
+        ' ======================================================================
+
+        ' -- CA : InstrId -----------------------------------------------------
+        For i = 2 To lastRow
+            .Range("CA" & i).Value = BV9_XTag("InstrId", BV9_CellStr(ws, i, "O"))
+        Next i
+
+        ' -- CB : EndToEndId --------------------------------------------------
+        For i = 2 To lastRow
+            sta = BV9_CellStr(ws, i, "P")
+            If Len(sta) = 0 Then sta = "Eid" & rd1
+            .Range("CB" & i).Value = "<EndToEndId>" & sta & "</EndToEndId>"
+        Next i
+
+        ' -- Random fallback for InstdAmt value --------------------------------
+        For i = 2 To lastRow
+            If IsEmpty(.Range("R" & i).Value) Then
+                .Range("R" & i).Value = Int(100 + Rnd * 900)
+            End If
+        Next i
+
+        ' -- CC : Amt block  (AmountType4Choice: InstdAmt OR EqvtAmt) ---------
+        '         Opens with </PmtId> and closes with <CdtrAgt> opener
+        For i = 2 To lastRow
+            eqvtAmtVal = BV9_CellStr(ws, i, "S")
+            eqvtAmtCcy = BV9_CellStr(ws, i, "T")
+            ccyOfTrf   = BV9_CellStr(ws, i, "U")
+            If Len(eqvtAmtVal) > 0 And Len(eqvtAmtCcy) > 0 And Len(ccyOfTrf) > 0 Then
+                amtBlock = "<Amt><EqvtAmt>" & _
+                           "<Amt Ccy=""" & eqvtAmtCcy & """>" & eqvtAmtVal & "</Amt>" & _
+                           "<CcyOfTrf>" & ccyOfTrf & "</CcyOfTrf>" & _
+                           "</EqvtAmt></Amt>"
+            Else
+                amtBlock = "<Amt><InstdAmt Ccy=""" & BV9_CellStr(ws, i, "Q") & """>" & _
+                           BV9_CellStr(ws, i, "R") & "</InstdAmt></Amt>"
+            End If
+            .Range("CC" & i).Value = "</PmtId>" & amtBlock & "<CdtrAgt>"
+        Next i
+
+        ' -- CD : CdtrAgt FinInstnId + PstlAdr + Cdtr open -------------------
+        '         ClrSysId XSD choice: Cd (col W) takes priority over Prtry (col X)
+        For i = 2 To lastRow
+            cdtrBicfi   = BV9_CellStr(ws, i, "V")
+            clrSysCd    = BV9_CellStr(ws, i, "W")
+            clrSysPrtry = BV9_CellStr(ws, i, "X")
+            mmbId       = BV9_CellStr(ws, i, "Y")
+
+            If Len(cdtrBicfi) >= 6 Then
+                extracted = Mid(cdtrBicfi, 5, 2)   ' country from BICFI chars 5-6
+            Else
+                extracted = ""
+            End If
+
+            ' ClrSysId: Cd takes priority (XSD choice)
+            If Len(clrSysCd) > 0 Then
+                clrSysIdBlock = "<ClrSysId><Cd>" & clrSysCd & "</Cd></ClrSysId>"
+            ElseIf Len(clrSysPrtry) > 0 Then
+                clrSysIdBlock = "<ClrSysId><Prtry>" & clrSysPrtry & "</Prtry></ClrSysId>"
+            Else
+                clrSysIdBlock = ""
+            End If
+
+            ' ClrSysMmbId only when MmbId present
+            If Len(mmbId) > 0 Then
+                clrSysBlock = "<ClrSysMmbId>" & clrSysIdBlock & _
+                              "<MmbId>" & mmbId & "</MmbId></ClrSysMmbId>"
+            Else
+                clrSysBlock = ""
+            End If
+
+            finInstnBlock = "<FinInstnId>"
+            If Len(cdtrBicfi) > 0 Then
+                finInstnBlock = finInstnBlock & "<BICFI>" & cdtrBicfi & "</BICFI>"
+            End If
+            finInstnBlock = finInstnBlock & clrSysBlock
+
+            .Range("CD" & i).Value = finInstnBlock & _
+                "<PstlAdr><Ctry>" & extracted & "</Ctry></PstlAdr></FinInstnId></CdtrAgt>" & _
+                "<Cdtr><Nm>Abigail Gerfried</Nm><PstlAdr>"
+        Next i
+
+        ' -- CE : Cdtr address + close ----------------------------------------
+        For i = 2 To lastRow
+            If Len(BV9_CellStr(ws, i, "V")) >= 6 Then
+                extr2 = Mid(BV9_CellStr(ws, i, "V"), 5, 2)
+            Else
+                extr2 = ""
+            End If
+            .Range("CE" & i).Value = _
+                "<Ctry>" & extr2 & "</Ctry>" & _
+                "<AdrLine>Schulstrasse 4</AdrLine>" & _
+                "<AdrLine>32547 Bad Oyenhausen</AdrLine></PstlAdr>" & _
+                "<CtryOfRes>" & extr2 & "</CtryOfRes></Cdtr>"
+        Next i
+
+        ' -- CF : CdtrAcct ----------------------------------------------------
+        For i = 2 To lastRow
+            If BV9_CellStr(ws, i, "Z") = "IBAN" Then
+                .Range("CF" & i).Value = _
+                    "<CdtrAcct><Id><IBAN>" & BV9_CellStr(ws, i, "AA") & "</IBAN></Id>" & _
+                    "<Ccy>" & BV9_CellStr(ws, i, "Q") & "</Ccy></CdtrAcct>"
+            Else
+                .Range("CF" & i).Value = _
+                    "<CdtrAcct><Id><Othr><Id>" & BV9_CellStr(ws, i, "AA") & "</Id></Othr></Id>" & _
+                    "<Ccy>" & BV9_CellStr(ws, i, "Q") & "</Ccy></CdtrAcct>"
+            End If
+        Next i
+
+        ' -- CG : Purp  (Purpose2Choice: Cd OR Prtry) ------------------------
+        For i = 2 To lastRow
+            purpCd    = BV9_CellStr(ws, i, "AB")
+            purpPrtry = BV9_CellStr(ws, i, "AC")
+            If Len(purpCd) > 0 Then
+                .Range("CG" & i).Value = "<Purp><Cd>" & purpCd & "</Cd></Purp>"
+            ElseIf Len(purpPrtry) > 0 Then
+                .Range("CG" & i).Value = "<Purp><Prtry>" & purpPrtry & "</Prtry></Purp>"
+            Else
+                .Range("CG" & i).Value = ""
+            End If
+        Next i
+
+        ' -- CL : Bouchons / InstrForCdtrAgt  (suppress if col AJ non-empty) -
+        '         Placed between CG(Purp) and CH(RgltryRptg) in CN concatenation
+        For i = 2 To lastRow
+            If Len(BV9_CellStr(ws, i, "AJ")) = 0 Then
+                .Range("CL" & i).Value = _
+                    "<InstrForCdtrAgt><InstrInf>" & _
+                    "SIMUL-FBK//AUTH/OK/AMI000/E0/ SIMUL-FBK//BOOK/OK/AMI000/" & _
+                    "</InstrInf></InstrForCdtrAgt>"
+            Else
+                .Range("CL" & i).Value = ""
+            End If
+        Next i
+
+        ' -- CH + CI : RgltryRptg  (StructuredRegulatoryReporting3) -----------
+        For i = 2 To lastRow
+            rgCd = BV9_CellStr(ws, i, "AD")
+            rg1  = BV9_CellStr(ws, i, "AE")
+            rg2  = BV9_CellStr(ws, i, "AF")
+            rg3  = BV9_CellStr(ws, i, "AG")
+            rg4  = BV9_CellStr(ws, i, "AH")
+            rg5  = BV9_CellStr(ws, i, "AI")
+
+            hasRgltry = (Len(rgCd) > 0 Or Len(rg1) > 0 Or Len(rg2) > 0 Or _
+                         Len(rg3) > 0 Or Len(rg4) > 0 Or Len(rg5) > 0)
+            If hasRgltry Then
+                dtlsBlock = "<Dtls>" & _
+                            BV9_XTag("Cd",  rgCd) & _
+                            BV9_XTag("Inf", rg1)  & _
+                            BV9_XTag("Inf", rg2)  & _
+                            BV9_XTag("Inf", rg3)  & _
+                            BV9_XTag("Inf", rg4)  & _
+                            BV9_XTag("Inf", rg5)  & _
+                            "</Dtls>"
+                .Range("CH" & i).Value = "<RgltryRptg>" & dtlsBlock
+                .Range("CI" & i).Value = "</RgltryRptg>"
+            Else
+                .Range("CH" & i).Value = ""
+                .Range("CI" & i).Value = ""
+            End If
+        Next i
+
+        ' -- CJ : RmtInf block -----------------------------------------------
+        '         MISTRAL in its own <Ustrd>; col AK in a second <Ustrd>
+        '         Channel from col C  (default SFA)
+        For i = 2 To lastRow
+            randomNumber  = ""
+            randomNumber1 = ""
+            For j = 1 To 2
+                randomNumber  = randomNumber  & CStr(Int(10 * Rnd))
+                randomNumber1 = randomNumber1 & CStr(Int(10 * Rnd))
+                randomDigit   = Int(10 * Rnd)
+                mi1 = Chr(Int(26 * Rnd + 65))
+                mi2 = Chr(Int(26 * Rnd + 65))
+                mi3 = Chr(Int(26 * Rnd + 65))
+            Next j
+
+            channel = BV9_CellStr(ws, i, "C")
+            If Len(channel) = 0 Then channel = "SFA"
+
+            mistralContent = "/MISTRAL_SO//" & mi1 & mi2 & mi3 & headerdt1 & randomNumber & _
+                             "//BULK//" & mi3 & mi1 & mi2 & headerdt1 & _
+                             CStr(randomDigit) & randomNumber1 & "//CHAN//" & channel & "/"
+
+            ustrdBlock = "<Ustrd>" & mistralContent & "</Ustrd>"
+            If Len(BV9_CellStr(ws, i, "AK")) > 0 Then
+                ustrdBlock = ustrdBlock & "<Ustrd>" & BV9_CellStr(ws, i, "AK") & "</Ustrd>"
+            End If
+
+            ' Structured remittance - AddtlRmtInf lines (cols AM-AQ)
+            s1 = BV9_CellStr(ws, i, "AM")
+            s2 = BV9_CellStr(ws, i, "AN")
+            s3 = BV9_CellStr(ws, i, "AO")
+            s4 = BV9_CellStr(ws, i, "AP")
+            s5 = BV9_CellStr(ws, i, "AQ")
+
+            strdBlock = ""
+            If Len(s1) > 0 Or Len(s2) > 0 Or Len(s3) > 0 Then
+                strdBlock = strdBlock & "<Strd>" & _
+                            BV9_XTag("AddtlRmtInf", s1) & _
+                            BV9_XTag("AddtlRmtInf", s2) & _
+                            BV9_XTag("AddtlRmtInf", s3) & "</Strd>"
+            End If
+            If Len(s4) > 0 Or Len(s5) > 0 Then
+                strdBlock = strdBlock & "<Strd>" & _
+                            BV9_XTag("AddtlRmtInf", s4) & _
+                            BV9_XTag("AddtlRmtInf", s5) & "</Strd>"
+            End If
+
+            If Len(mistralContent) > 0 Or Len(strdBlock) > 0 Then
+                rmtInfBlock = "<RmtInf>" & ustrdBlock & strdBlock & "</RmtInf>"
+            Else
+                rmtInfBlock = ""
+            End If
+            .Range("CJ" & i).Value = rmtInfBlock
+        Next i
+
+        ' -- CK : close CdtTrfTxInf  (child close ONLY – no PmtInf/Document) -
+        For i = 2 To lastRow
+            .Range("CK" & i).Value = "</CdtTrfTxInf>"
+        Next i
+
+        ' -- CN : complete per-row CdtTrfTxInf fragment -----------------------
+        '   = <CdtTrfTxInf><PmtId>  +  CA + CB + CC + CD + CE + CF
+        '                             +  CG + CL + CH + CI + CJ + CK
+        '   (CL bouchons sits between CG/Purp and CH/RgltryRptg – same order
+        '    as xmlCols in the single-tx version)
+        txCols = Array("CA", "CB", "CC", "CD", "CE", "CF", _
+                       "CG", "CL", "CH", "CI", "CJ", "CK")
+        For i = 2 To lastRow
+            txFrag = "<CdtTrfTxInf><PmtId>"
+            For Each col In txCols
+                txFrag = txFrag & .Cells(i, col).Value
+            Next col
+            .Range("CN" & i).Value = txFrag
+        Next i
+
+        ' ======================================================================
+        ' PHASE 2: Group rows by col B; write ONE file per unique group key.
+        '
+        ' Assembly order per file:
+        '   [IPAS header]      <- BV9_BuildIpasHeader (fresh per file)
+        '   BN(fr)+BO(fr)+"T00:00:00</CreDtTm>"
+        '   + NbOfTxs(group) + CtrlSum(group) + InitgPty + </GrpHdr>
+        '   + <PmtInf>
+        '   + PmtInfId + PmtMtd + <BtchBookg>true</BtchBookg>
+        '   + NbOfTxs(group) + CtrlSum(group)
+        '   + BR(fr)+BS(fr)+BT(fr)+BU(fr)+BV(fr)+BW(fr)+BY(fr)+BZ(fr)
+        '   + CN(row1) + CN(row2) + ... + CN(rowN)
+        '   + </PmtInf></CstmrCdtTrfInitn></Document>
+        '
+        ' Sleep 700ms between file writes ensures unique IPAS timestamps.
+        ' ======================================================================
+        OutputPath = "Y:\_ApplicationData\EUFTtransfer-EUFT\se-SCB-IPAS\Input\"
+
+        For i = 2 To lastRow
+
+            If processed(i) Then GoTo NextGroup
+
+            groupKey = BV9_CellStr(ws, i, "B")
+            If Len(Trim(groupKey)) = 0 Then GoTo NextGroup
+
+            ' ------------------------------------------------------------------
+            ' Collect all rows in this group (same col B value)
+            ' ------------------------------------------------------------------
+            ReDim groupRows(1 To lastRow)
+            groupCount = 0
+            For k = i To lastRow
+                If BV9_CellStr(ws, k, "B") = groupKey Then
+                    groupCount = groupCount + 1
+                    groupRows(groupCount) = k
+                    processed(k) = True
+                End If
+            Next k
+
+            ' ------------------------------------------------------------------
+            ' Compute CtrlSum: sum of all children's amounts
+            '   EqvtAmt path (col S) takes priority; otherwise InstdAmt (col R)
+            ' ------------------------------------------------------------------
+            ctrlSum = 0
+            For r = 1 To groupCount
+                rowIdx  = groupRows(r)
+                eqvtVal = BV9_CellStr(ws, rowIdx, "S")
+                If Len(eqvtVal) > 0 Then
+                    ctrlSum = ctrlSum + Val(eqvtVal)
+                Else
+                    ctrlSum = ctrlSum + Val(BV9_CellStr(ws, rowIdx, "R"))
+                End If
+            Next r
+            ctrlSumStr = Replace(Format(ctrlSum, "0.00"), ",", ".")
+
+            fr = groupRows(1)   ' first row of the group
+
+            ' ------------------------------------------------------------------
+            ' GrpHdr block  (from first row; NbOfTxs/CtrlSum injected live)
+            ' ------------------------------------------------------------------
+            grpHdrBlock = .Range("BN" & fr).Value & _
+                          .Range("BO" & fr).Value & _
+                          "T00:00:00</CreDtTm>" & _
+                          "<NbOfTxs>" & groupCount & "</NbOfTxs>" & _
+                          "<CtrlSum>" & ctrlSumStr & "</CtrlSum>" & _
+                          "<InitgPty><Nm>BNP client</Nm></InitgPty>" & _
+                          "</GrpHdr>"
+
+            ' ------------------------------------------------------------------
+            ' PmtInf opening block  (PmtInf-level elements, all from first row)
+            ' BtchBookg=true; NbOfTxs/CtrlSum = group totals
+            ' ------------------------------------------------------------------
+            pmtInfOpenBlock = "<PmtInf>" & _
+                              "<PmtInfId>" & .Range("BQ" & fr).Value & "</PmtInfId>" & _
+                              "<PmtMtd>TRF</PmtMtd>" & _
+                              "<BtchBookg>true</BtchBookg>" & _
+                              "<NbOfTxs>" & groupCount & "</NbOfTxs>" & _
+                              "<CtrlSum>" & ctrlSumStr & "</CtrlSum>" & _
+                              .Range("BR" & fr).Value & _
+                              .Range("BS" & fr).Value & _
+                              .Range("BT" & fr).Value & _
+                              .Range("BU" & fr).Value & _
+                              .Range("BV" & fr).Value & _
+                              .Range("BW" & fr).Value & _
+                              .Range("BY" & fr).Value & _
+                              .Range("BZ" & fr).Value
+
+            ' ------------------------------------------------------------------
+            ' Concatenate all CdtTrfTxInf children
+            ' ------------------------------------------------------------------
+            txBlocks = ""
+            For r = 1 To groupCount
+                txBlocks = txBlocks & .Range("CN" & groupRows(r)).Value
+            Next r
+
+            ' ------------------------------------------------------------------
+            ' Full XML body
+            ' ------------------------------------------------------------------
+            fullXML = grpHdrBlock & pmtInfOpenBlock & txBlocks & _
+                      "</PmtInf></CstmrCdtTrfInitn></Document>"
+
+            ' ------------------------------------------------------------------
+            ' Write file
+            ' File name: {J of first row}_{groupKey}_{Rand4}_BulkPain001v9.txt
+            ' ------------------------------------------------------------------
+            filePath = OutputPath & _
+                       ws.Range("J" & fr).Value & "_" & groupKey & "_" & _
+                       BV9_Rand4() & "_BulkPain001v9.txt"
+
+            fileNum = FreeFile
+            Open filePath For Output As #fileNum
+            Print #fileNum, BV9_BuildIpasHeader(ws, fr)   ' fresh unique header
+            Print #fileNum, fullXML
+            Close #fileNum
+
+            Sleep 700   ' 700ms between files -> guaranteed unique IPAS timestamps
+
+NextGroup:
+        Next i
+
+        ' ======================================================================
+        ' Clear all work columns (preserves row 1 headers and input data)
+        ' ======================================================================
+        .Range("BN2:CN5000").ClearContents
+
+    End With
+
+    MsgBox " Bulk Export completed "
+
+End Sub
