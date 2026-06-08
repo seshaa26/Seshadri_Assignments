@@ -1,4 +1,4 @@
-Attribute VB_Name = "BulkV9"
+'Attribute VB_Name = "BulkV9"
 ' ==============================================================================
 ' pain.001.001.09  -  BULK Customer Credit Transfer Initiation Export
 ' CGI-MP V09  |  ISO 20022
@@ -78,7 +78,7 @@ Option Explicit
 
 Private Function BV9_CellStr(ws As Worksheet, Row As Long, col As String) As String
     Dim v As Variant
-    v = ws.Range(col & Row).Value
+    v = ws.Range(col & Row).value
     If IsEmpty(v) Or IsNull(v) Then
         BV9_CellStr = ""
     Else
@@ -137,10 +137,10 @@ Private Function BV9_BuildIpasHeader(ws As Worksheet, Row As Long) As String
 
     hdt1 = yy2 & mm & dd & hh & nn & ss   ' 12-char short timestamp
     hdt2 = yy & mm & dd & hh & nn & ss    ' 14-char long  timestamp
-    ch   = Chr(Int(26 * Rnd + 65))         ' random A-Z
-    ms   = CStr(CLng(Timer * 1000) Mod 1000)
+    ch = Chr(Int(26 * Rnd + 65))           ' random A-Z
+    ms = CStr(CLng(Timer * 1000) Mod 1000)
 
-    dVal = Trim(CStr(ws.Cells(Row, "D").Value))
+    dVal = Trim(CStr(ws.Cells(Row, "D").value))
     Select Case dVal
         Case "EMX": GCH = "IF01EMX                 PAIN001"
         Case "ITL": GCH = "IF01ITL                 SCBCTCB"
@@ -163,11 +163,11 @@ Sub ExportBulkV9()
     ' --------------------------------------------------------------------------
     Dim ws  As Worksheet
     Dim ws1 As Worksheet
-    Set ws  = ThisWorkbook.Sheets("XIPfill")
+    Set ws = ThisWorkbook.Sheets("XIPfill")
     Set ws1 = ThisWorkbook.Sheets("BIClist")
 
     Dim lastRow As Long
-    lastRow = ws.Cells(ws.Rows.Count, "B").End(xlUp).Row
+    lastRow = ws.Cells(ws.rows.Count, "B").End(xlUp).Row
 
     If lastRow < 2 Then
         MsgBox "No data rows found (col B is empty)."
@@ -184,15 +184,15 @@ Sub ExportBulkV9()
     Dim createdt As String, headerdt1 As String, milliseconds As String
 
     dtsnow = Now()
-    dd  = Right("00" & Day(dtsnow), 2)
-    mm  = Right("00" & Month(dtsnow), 2)
-    yy  = CStr(Year(dtsnow))
+    dd = Right("00" & Day(dtsnow), 2)
+    mm = Right("00" & Month(dtsnow), 2)
+    yy = CStr(Year(dtsnow))
     yy2 = Right("00" & Year(dtsnow), 2)
-    hh  = Right("00" & Hour(dtsnow), 2)
-    nn  = Right("00" & Minute(dtsnow), 2)
-    ss  = Right("00" & Second(dtsnow), 2)
+    hh = Right("00" & Hour(dtsnow), 2)
+    nn = Right("00" & Minute(dtsnow), 2)
+    ss = Right("00" & Second(dtsnow), 2)
 
-    createdt  = yy & "-" & mm & "-" & dd
+    createdt = yy & "-" & mm & "-" & dd
     headerdt1 = yy2 & mm & dd & hh & nn & ss
     milliseconds = CStr(CLng(Timer * 1000) Mod 1000)
 
@@ -271,66 +271,66 @@ Sub ExportBulkV9()
         ' -- BN : XML decl + GrpHdr open + MsgId + <CreDtTm> -----------------
         ' -- BO : CreDtTm date part  (YYYY-MM-DD) ----------------------------
         For i = 2 To lastRow
-            .Range("BN" & i).Value = _
+            .Range("BN" & i).value = _
                 "<?xml version=""1.0"" encoding=""UTF-8""?>" & _
                 "<Document xmlns=""urn:iso:std:iso:20022:tech:xsd:pain.001.001.09"">" & _
                 "<CstmrCdtTrfInitn><GrpHdr>" & _
                 "<MsgId>" & BV9_CellStr(ws, i, "B") & BV9_UniqueId12() & "</MsgId>" & _
                 "<CreDtTm>"
-            .Range("BO" & i).Value = createdt
+            .Range("BO" & i).value = createdt
         Next i
 
         ' -- BQ : raw PmtInfId reference string (XML wrapper added in Phase 2) -
         For i = 2 To lastRow
             refStr = BV9_CellStr(ws, i, "B") & rd1 & milliseconds & rd1
             If Len(BV9_CellStr(ws, i, "B")) = 0 Then refStr = "userref" & rd1 & milliseconds
-            .Range("BQ" & i).Value = refStr
+            .Range("BQ" & i).value = refStr
         Next i
 
         ' -- BR : PmtTpInf open + InstrPrty  (PmtInf level) ------------------
         For i = 2 To lastRow
             instrPrty = UCase(BV9_CellStr(ws, i, "E"))
             If instrPrty <> "HIGH" And instrPrty <> "NORM" Then instrPrty = "NORM"
-            .Range("BR" & i).Value = "<PmtTpInf><InstrPrty>" & instrPrty & "</InstrPrty>"
+            .Range("BR" & i).value = "<PmtTpInf><InstrPrty>" & instrPrty & "</InstrPrty>"
         Next i
 
         ' -- BS : SvcLvl  (PmtInf level) -------------------------------------
         For i = 2 To lastRow
             svcLvl = BV9_CellStr(ws, i, "F")
             If Len(svcLvl) > 0 Then
-                .Range("BS" & i).Value = "<SvcLvl><Cd>" & svcLvl & "</Cd></SvcLvl>"
+                .Range("BS" & i).value = "<SvcLvl><Cd>" & svcLvl & "</Cd></SvcLvl>"
             Else
-                .Range("BS" & i).Value = ""
+                .Range("BS" & i).value = ""
             End If
         Next i
 
         ' -- BT : CtgyPurp  (PmtInf level) -----------------------------------
         For i = 2 To lastRow
-            ctgyPurpCd    = BV9_CellStr(ws, i, "G")
+            ctgyPurpCd = BV9_CellStr(ws, i, "G")
             ctgyPurpPrtry = BV9_CellStr(ws, i, "H")
             If Len(ctgyPurpCd) > 0 Then
-                .Range("BT" & i).Value = "<CtgyPurp><Cd>" & ctgyPurpCd & "</Cd></CtgyPurp>"
+                .Range("BT" & i).value = "<CtgyPurp><Cd>" & ctgyPurpCd & "</Cd></CtgyPurp>"
             ElseIf Len(ctgyPurpPrtry) > 0 Then
-                .Range("BT" & i).Value = "<CtgyPurp><Prtry>" & ctgyPurpPrtry & "</Prtry></CtgyPurp>"
+                .Range("BT" & i).value = "<CtgyPurp><Prtry>" & ctgyPurpPrtry & "</Prtry></CtgyPurp>"
             Else
-                .Range("BT" & i).Value = ""
+                .Range("BT" & i).value = ""
             End If
         Next i
 
         ' -- BU : close PmtTpInf + ReqdExctnDt  (PmtInf level) ---------------
         For i = 2 To lastRow
-            inp = Now() + .Range("I" & i).Value
-            dd      = Right("00" & Day(inp), 2)
-            mm      = Right("00" & Month(inp), 2)
-            yy      = CStr(Year(inp))
+            inp = Now() + .Range("I" & i).value
+            dd = Right("00" & Day(inp), 2)
+            mm = Right("00" & Month(inp), 2)
+            yy = CStr(Year(inp))
             exeDate = yy & "-" & mm & "-" & dd
-            .Range("BU" & i).Value = _
+            .Range("BU" & i).value = _
                 "</PmtTpInf><ReqdExctnDt><Dt>" & exeDate & "</Dt></ReqdExctnDt>"
         Next i
 
         ' -- BV : static Debtor block  (PmtInf level) -------------------------
         For i = 2 To lastRow
-            .Range("BV" & i).Value = _
+            .Range("BV" & i).value = _
                 "<Dbtr><Nm>KVERNELAND AS</Nm>" & _
                 "<PstlAdr><Ctry>GB</Ctry>" & _
                 "<AdrLine>PLOGFABRIKKVEGEN 1</AdrLine>" & _
@@ -341,12 +341,12 @@ Sub ExportBulkV9()
         ' -- BW : DbtrAcct + DbtrAgt open  (PmtInf level) --------------------
         For i = 2 To lastRow
             If BV9_CellStr(ws, i, "K") = "IBAN" Then
-                .Range("BW" & i).Value = _
+                .Range("BW" & i).value = _
                     "<DbtrAcct><Id><IBAN>" & BV9_CellStr(ws, i, "L") & "</IBAN></Id>" & _
                     "<Ccy>" & BV9_CellStr(ws, i, "M") & "</Ccy></DbtrAcct>" & _
                     "<DbtrAgt><FinInstnId>"
             Else
-                .Range("BW" & i).Value = _
+                .Range("BW" & i).value = _
                     "<DbtrAcct><Id><Othr><Id>" & BV9_CellStr(ws, i, "L") & "</Id></Othr></Id>" & _
                     "<Ccy>" & BV9_CellStr(ws, i, "M") & "</Ccy></DbtrAcct>" & _
                     "<DbtrAgt><FinInstnId>"
@@ -356,10 +356,10 @@ Sub ExportBulkV9()
         ' -- BX / BY : DbtrAgt BICFI lookup  (PmtInf level) ------------------
         For i = 2 To lastRow
             On Error Resume Next
-            .Range("BX" & i).Value = Application.WorksheetFunction.VLookup( _
+            .Range("BX" & i).value = Application.WorksheetFunction.VLookup( _
                 ws.Range("J" & i), Myrange, 2, False)
             On Error GoTo 0
-            .Range("BY" & i).Value = _
+            .Range("BY" & i).value = _
                 "<BICFI>" & BV9_CellStr(ws, i, "BX") & "</BICFI>" & _
                 "</FinInstnId></DbtrAgt>"
         Next i
@@ -368,7 +368,7 @@ Sub ExportBulkV9()
         '         NOTE: in single-tx version BZ also opened <CdtTrfTxInf><PmtId>.
         '         In bulk that opening lives in CN so it repeats per child.
         For i = 2 To lastRow
-            .Range("BZ" & i).Value = "<ChrgBr>" & BV9_CellStr(ws, i, "N") & "</ChrgBr>"
+            .Range("BZ" & i).value = "<ChrgBr>" & BV9_CellStr(ws, i, "N") & "</ChrgBr>"
         Next i
 
         ' ======================================================================
@@ -378,20 +378,20 @@ Sub ExportBulkV9()
 
         ' -- CA : InstrId -----------------------------------------------------
         For i = 2 To lastRow
-            .Range("CA" & i).Value = BV9_XTag("InstrId", BV9_CellStr(ws, i, "O"))
+            .Range("CA" & i).value = BV9_XTag("InstrId", BV9_CellStr(ws, i, "O"))
         Next i
 
         ' -- CB : EndToEndId --------------------------------------------------
         For i = 2 To lastRow
             sta = BV9_CellStr(ws, i, "P")
             If Len(sta) = 0 Then sta = "Eid" & rd1
-            .Range("CB" & i).Value = "<EndToEndId>" & sta & "</EndToEndId>"
+            .Range("CB" & i).value = "<EndToEndId>" & sta & "</EndToEndId>"
         Next i
 
         ' -- Random fallback for InstdAmt value --------------------------------
         For i = 2 To lastRow
-            If IsEmpty(.Range("R" & i).Value) Then
-                .Range("R" & i).Value = Int(100 + Rnd * 900)
+            If IsEmpty(.Range("R" & i).value) Then
+                .Range("R" & i).value = Int(100 + Rnd * 900)
             End If
         Next i
 
@@ -400,7 +400,7 @@ Sub ExportBulkV9()
         For i = 2 To lastRow
             eqvtAmtVal = BV9_CellStr(ws, i, "S")
             eqvtAmtCcy = BV9_CellStr(ws, i, "T")
-            ccyOfTrf   = BV9_CellStr(ws, i, "U")
+            ccyOfTrf = BV9_CellStr(ws, i, "U")
             If Len(eqvtAmtVal) > 0 And Len(eqvtAmtCcy) > 0 And Len(ccyOfTrf) > 0 Then
                 amtBlock = "<Amt><EqvtAmt>" & _
                            "<Amt Ccy=""" & eqvtAmtCcy & """>" & eqvtAmtVal & "</Amt>" & _
@@ -410,16 +410,16 @@ Sub ExportBulkV9()
                 amtBlock = "<Amt><InstdAmt Ccy=""" & BV9_CellStr(ws, i, "Q") & """>" & _
                            BV9_CellStr(ws, i, "R") & "</InstdAmt></Amt>"
             End If
-            .Range("CC" & i).Value = "</PmtId>" & amtBlock & "<CdtrAgt>"
+            .Range("CC" & i).value = "</PmtId>" & amtBlock & "<CdtrAgt>"
         Next i
 
         ' -- CD : CdtrAgt FinInstnId + PstlAdr + Cdtr open -------------------
         '         ClrSysId XSD choice: Cd (col W) takes priority over Prtry (col X)
         For i = 2 To lastRow
-            cdtrBicfi   = BV9_CellStr(ws, i, "V")
-            clrSysCd    = BV9_CellStr(ws, i, "W")
+            cdtrBicfi = BV9_CellStr(ws, i, "V")
+            clrSysCd = BV9_CellStr(ws, i, "W")
             clrSysPrtry = BV9_CellStr(ws, i, "X")
-            mmbId       = BV9_CellStr(ws, i, "Y")
+            mmbId = BV9_CellStr(ws, i, "Y")
 
             If Len(cdtrBicfi) >= 6 Then
                 extracted = Mid(cdtrBicfi, 5, 2)   ' country from BICFI chars 5-6
@@ -450,7 +450,7 @@ Sub ExportBulkV9()
             End If
             finInstnBlock = finInstnBlock & clrSysBlock
 
-            .Range("CD" & i).Value = finInstnBlock & _
+            .Range("CD" & i).value = finInstnBlock & _
                 "<PstlAdr><Ctry>" & extracted & "</Ctry></PstlAdr></FinInstnId></CdtrAgt>" & _
                 "<Cdtr><Nm>Abigail Gerfried</Nm><PstlAdr>"
         Next i
@@ -462,7 +462,7 @@ Sub ExportBulkV9()
             Else
                 extr2 = ""
             End If
-            .Range("CE" & i).Value = _
+            .Range("CE" & i).value = _
                 "<Ctry>" & extr2 & "</Ctry>" & _
                 "<AdrLine>Schulstrasse 4</AdrLine>" & _
                 "<AdrLine>32547 Bad Oyenhausen</AdrLine></PstlAdr>" & _
@@ -472,11 +472,11 @@ Sub ExportBulkV9()
         ' -- CF : CdtrAcct ----------------------------------------------------
         For i = 2 To lastRow
             If BV9_CellStr(ws, i, "Z") = "IBAN" Then
-                .Range("CF" & i).Value = _
+                .Range("CF" & i).value = _
                     "<CdtrAcct><Id><IBAN>" & BV9_CellStr(ws, i, "AA") & "</IBAN></Id>" & _
                     "<Ccy>" & BV9_CellStr(ws, i, "Q") & "</Ccy></CdtrAcct>"
             Else
-                .Range("CF" & i).Value = _
+                .Range("CF" & i).value = _
                     "<CdtrAcct><Id><Othr><Id>" & BV9_CellStr(ws, i, "AA") & "</Id></Othr></Id>" & _
                     "<Ccy>" & BV9_CellStr(ws, i, "Q") & "</Ccy></CdtrAcct>"
             End If
@@ -484,14 +484,14 @@ Sub ExportBulkV9()
 
         ' -- CG : Purp  (Purpose2Choice: Cd OR Prtry) ------------------------
         For i = 2 To lastRow
-            purpCd    = BV9_CellStr(ws, i, "AB")
+            purpCd = BV9_CellStr(ws, i, "AB")
             purpPrtry = BV9_CellStr(ws, i, "AC")
             If Len(purpCd) > 0 Then
-                .Range("CG" & i).Value = "<Purp><Cd>" & purpCd & "</Cd></Purp>"
+                .Range("CG" & i).value = "<Purp><Cd>" & purpCd & "</Cd></Purp>"
             ElseIf Len(purpPrtry) > 0 Then
-                .Range("CG" & i).Value = "<Purp><Prtry>" & purpPrtry & "</Prtry></Purp>"
+                .Range("CG" & i).value = "<Purp><Prtry>" & purpPrtry & "</Prtry></Purp>"
             Else
-                .Range("CG" & i).Value = ""
+                .Range("CG" & i).value = ""
             End If
         Next i
 
@@ -499,40 +499,40 @@ Sub ExportBulkV9()
         '         Placed between CG(Purp) and CH(RgltryRptg) in CN concatenation
         For i = 2 To lastRow
             If Len(BV9_CellStr(ws, i, "AJ")) = 0 Then
-                .Range("CL" & i).Value = _
+                .Range("CL" & i).value = _
                     "<InstrForCdtrAgt><InstrInf>" & _
                     "SIMUL-FBK//AUTH/OK/AMI000/E0/ SIMUL-FBK//BOOK/OK/AMI000/" & _
                     "</InstrInf></InstrForCdtrAgt>"
             Else
-                .Range("CL" & i).Value = ""
+                .Range("CL" & i).value = ""
             End If
         Next i
 
         ' -- CH + CI : RgltryRptg  (StructuredRegulatoryReporting3) -----------
         For i = 2 To lastRow
             rgCd = BV9_CellStr(ws, i, "AD")
-            rg1  = BV9_CellStr(ws, i, "AE")
-            rg2  = BV9_CellStr(ws, i, "AF")
-            rg3  = BV9_CellStr(ws, i, "AG")
-            rg4  = BV9_CellStr(ws, i, "AH")
-            rg5  = BV9_CellStr(ws, i, "AI")
+            rg1 = BV9_CellStr(ws, i, "AE")
+            rg2 = BV9_CellStr(ws, i, "AF")
+            rg3 = BV9_CellStr(ws, i, "AG")
+            rg4 = BV9_CellStr(ws, i, "AH")
+            rg5 = BV9_CellStr(ws, i, "AI")
 
             hasRgltry = (Len(rgCd) > 0 Or Len(rg1) > 0 Or Len(rg2) > 0 Or _
                          Len(rg3) > 0 Or Len(rg4) > 0 Or Len(rg5) > 0)
             If hasRgltry Then
                 dtlsBlock = "<Dtls>" & _
-                            BV9_XTag("Cd",  rgCd) & _
-                            BV9_XTag("Inf", rg1)  & _
-                            BV9_XTag("Inf", rg2)  & _
-                            BV9_XTag("Inf", rg3)  & _
-                            BV9_XTag("Inf", rg4)  & _
-                            BV9_XTag("Inf", rg5)  & _
+                            BV9_XTag("Cd", rgCd) & _
+                            BV9_XTag("Inf", rg1) & _
+                            BV9_XTag("Inf", rg2) & _
+                            BV9_XTag("Inf", rg3) & _
+                            BV9_XTag("Inf", rg4) & _
+                            BV9_XTag("Inf", rg5) & _
                             "</Dtls>"
-                .Range("CH" & i).Value = "<RgltryRptg>" & dtlsBlock
-                .Range("CI" & i).Value = "</RgltryRptg>"
+                .Range("CH" & i).value = "<RgltryRptg>" & dtlsBlock
+                .Range("CI" & i).value = "</RgltryRptg>"
             Else
-                .Range("CH" & i).Value = ""
-                .Range("CI" & i).Value = ""
+                .Range("CH" & i).value = ""
+                .Range("CI" & i).value = ""
             End If
         Next i
 
@@ -540,12 +540,12 @@ Sub ExportBulkV9()
         '         MISTRAL in its own <Ustrd>; col AK in a second <Ustrd>
         '         Channel from col C  (default SFA)
         For i = 2 To lastRow
-            randomNumber  = ""
+            randomNumber = ""
             randomNumber1 = ""
             For j = 1 To 2
-                randomNumber  = randomNumber  & CStr(Int(10 * Rnd))
+                randomNumber = randomNumber & CStr(Int(10 * Rnd))
                 randomNumber1 = randomNumber1 & CStr(Int(10 * Rnd))
-                randomDigit   = Int(10 * Rnd)
+                randomDigit = Int(10 * Rnd)
                 mi1 = Chr(Int(26 * Rnd + 65))
                 mi2 = Chr(Int(26 * Rnd + 65))
                 mi3 = Chr(Int(26 * Rnd + 65))
@@ -588,12 +588,12 @@ Sub ExportBulkV9()
             Else
                 rmtInfBlock = ""
             End If
-            .Range("CJ" & i).Value = rmtInfBlock
+            .Range("CJ" & i).value = rmtInfBlock
         Next i
 
         ' -- CK : close CdtTrfTxInf  (child close ONLY – no PmtInf/Document) -
         For i = 2 To lastRow
-            .Range("CK" & i).Value = "</CdtTrfTxInf>"
+            .Range("CK" & i).value = "</CdtTrfTxInf>"
         Next i
 
         ' -- CN : complete per-row CdtTrfTxInf fragment -----------------------
@@ -606,9 +606,9 @@ Sub ExportBulkV9()
         For i = 2 To lastRow
             txFrag = "<CdtTrfTxInf><PmtId>"
             For Each col In txCols
-                txFrag = txFrag & .Cells(i, col).Value
+                txFrag = txFrag & .Cells(i, col).value
             Next col
-            .Range("CN" & i).Value = txFrag
+            .Range("CN" & i).value = txFrag
         Next i
 
         ' ======================================================================
@@ -655,23 +655,23 @@ Sub ExportBulkV9()
             ' ------------------------------------------------------------------
             ctrlSum = 0
             For r = 1 To groupCount
-                rowIdx  = groupRows(r)
+                rowIdx = groupRows(r)
                 eqvtVal = BV9_CellStr(ws, rowIdx, "S")
                 If Len(eqvtVal) > 0 Then
-                    ctrlSum = ctrlSum + Val(eqvtVal)
+                    ctrlSum = ctrlSum + val(eqvtVal)
                 Else
-                    ctrlSum = ctrlSum + Val(BV9_CellStr(ws, rowIdx, "R"))
+                    ctrlSum = ctrlSum + val(BV9_CellStr(ws, rowIdx, "R"))
                 End If
             Next r
-            ctrlSumStr = Format(ctrlSum, "0.00")
+            ctrlSumStr = Replace(Format(ctrlSum, "0.00"), ",", ".")
 
             fr = groupRows(1)   ' first row of the group
 
             ' ------------------------------------------------------------------
             ' GrpHdr block  (from first row; NbOfTxs/CtrlSum injected live)
             ' ------------------------------------------------------------------
-            grpHdrBlock = .Range("BN" & fr).Value & _
-                          .Range("BO" & fr).Value & _
+            grpHdrBlock = .Range("BN" & fr).value & _
+                          .Range("BO" & fr).value & _
                           "T00:00:00</CreDtTm>" & _
                           "<NbOfTxs>" & groupCount & "</NbOfTxs>" & _
                           "<CtrlSum>" & ctrlSumStr & "</CtrlSum>" & _
@@ -683,26 +683,26 @@ Sub ExportBulkV9()
             ' BtchBookg=true; NbOfTxs/CtrlSum = group totals
             ' ------------------------------------------------------------------
             pmtInfOpenBlock = "<PmtInf>" & _
-                              "<PmtInfId>" & .Range("BQ" & fr).Value & "</PmtInfId>" & _
+                              "<PmtInfId>" & .Range("BQ" & fr).value & "</PmtInfId>" & _
                               "<PmtMtd>TRF</PmtMtd>" & _
                               "<BtchBookg>true</BtchBookg>" & _
                               "<NbOfTxs>" & groupCount & "</NbOfTxs>" & _
                               "<CtrlSum>" & ctrlSumStr & "</CtrlSum>" & _
-                              .Range("BR" & fr).Value & _
-                              .Range("BS" & fr).Value & _
-                              .Range("BT" & fr).Value & _
-                              .Range("BU" & fr).Value & _
-                              .Range("BV" & fr).Value & _
-                              .Range("BW" & fr).Value & _
-                              .Range("BY" & fr).Value & _
-                              .Range("BZ" & fr).Value
+                              .Range("BR" & fr).value & _
+                              .Range("BS" & fr).value & _
+                              .Range("BT" & fr).value & _
+                              .Range("BU" & fr).value & _
+                              .Range("BV" & fr).value & _
+                              .Range("BW" & fr).value & _
+                              .Range("BY" & fr).value & _
+                              .Range("BZ" & fr).value
 
             ' ------------------------------------------------------------------
             ' Concatenate all CdtTrfTxInf children
             ' ------------------------------------------------------------------
             txBlocks = ""
             For r = 1 To groupCount
-                txBlocks = txBlocks & .Range("CN" & groupRows(r)).Value
+                txBlocks = txBlocks & .Range("CN" & groupRows(r)).value
             Next r
 
             ' ------------------------------------------------------------------
@@ -716,7 +716,7 @@ Sub ExportBulkV9()
             ' File name: {J of first row}_{groupKey}_{Rand4}_BulkPain001v9.txt
             ' ------------------------------------------------------------------
             filePath = OutputPath & _
-                       ws.Range("J" & fr).Value & "_" & groupKey & "_" & _
+                       ws.Range("J" & fr).value & "_" & groupKey & "_" & _
                        BV9_Rand4() & "_BulkPain001v9.txt"
 
             fileNum = FreeFile
@@ -740,3 +740,5 @@ NextGroup:
     MsgBox " Bulk Export completed "
 
 End Sub
+
+
