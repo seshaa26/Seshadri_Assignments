@@ -1,0 +1,19 @@
+<PstlAdr>
+    <Dept>PLACEHOLDER_Cdtr_Dept</Dept>
+    <SubDept>PLACEHOLDER_Cdtr_SubDept</SubDept>
+    <StrtNm>PLACEHOLDER_Cdtr_StrtNm</StrtNm>
+    <BldgNb>PLACEHOLDER_Cdtr_BldgNb</BldgNb>
+    <BldgNm>PLACEHOLDER_Cdtr_1BldgNm</BldgNm>
+    <Flr>PLACEHOLDER_Cdtr_Flr</Flr>
+    <PstBx>PLACEHOLDER_Cdtr_PstBx</PstBx>
+    <Room>PLACEHOLDER_Cdtr_Room</Room>
+    <PstCd>PLACEHOLDER_Cdtr_PstCd</PstCd>
+    <TwnLctnNm>PLACEHOLDER_Cdtr_TwnLctnNm</TwnLctnNm>
+    <DstrctNm>PLACEHOLDER_Cdtr_DstrctNm</DstrctNm>
+    <TwnNm>PLACEHOLDER_Cdtr_TwnNm</TwnNm>
+    <CtrySubDvsn>PLACEHOLDER_CtrySubDvsn_Cdtr</CtrySubDvsn>
+    <Ctry>PLACEHOLDER_Cdtr_Ctry</Ctry>
+    <AdrLine>PLACEHOLDER_Cdtr_AdrLine</AdrLine>
+    <AdrLine>PLACEHOLDER_Cdtr_AdrLine1</AdrLine>
+    <AdrLine>PLACEHOLDER_Cdtr_AdrLine3</AdrLine>
+</PstlAdr>
