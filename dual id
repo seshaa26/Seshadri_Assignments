@@ -1,0 +1,28 @@
+00001  ATBLZ AT   Austrian Bankleitzahl                                
+00002  AUBSB AU   Australian Bank State Branch Code                    
+00003  CACPA CC   Canadian Payments Association Payment Routing Number 
+00004  CHBCC SW   Swiss Clearing Code (BC Code)                        
+00005  CHSIC SW   Swiss Clearing Code (SIC Code)                       
+00006  CNAPS CN   CNAPS Identifier                                     
+00007  DEBLZ BL   German Bankleitzahl                                  
+00008  ESNCC ES   Spanish Domestic Interbanking Code                   
+00009  GBDSC SC   UK Domestic Sort Code                                
+00010  GRBIC GR   Helenic Bank Identification Code                     
+00011  HKNCC HK   Hong Kong Bank Code                                  
+00012  IENCC IE   Irish National Clearing Code                         
+00013  INFSC IN   Indian Financial System code                         
+00014  ITNCC IT   Italian Domestic Identification Code                 
+00015  JPZGN      Japan Zengin Clearing Code                           
+00016  NZNCC NZ   New Zealand National Clearing Code                   
+00017  PLKNR PL   Polish National Clearing Code                        
+00018  PTNCC PT   Portuguese National Clearing Code                    
+00019  RUCBC RU   Russian Central Bank Identification Code             
+00020  SESBA      Sweden Bankgiro Clearing Code                        
+00021  SGIBG      IBG Sort Code                                        
+00022  TWNCC      Financial Institution Code          
+00023  USABA FW   Fedwire Routing Number              
+00024  USPID CP   CHIPS Participant Identifier        
+00025  ZANCC ZA   South African National Clearing Code
+00026  USCHI CH   CHIPS Universal Identifier          
+00027  PRTGS RT   Pay by Real Time Gross Settlement   
+00028  THCBC      Thai Central Bank                   
