@@ -1,0 +1,35 @@
+Set mistralAfterBulk = CreateObject("Scripting.Dictionary")
+
+For i = 2 To lastRow
+    randomNumber = ""
+    For j = 1 To 2
+        randomNumber = randomNumber & CStr(Int(10 * Rnd))
+    Next j
+    mi1 = Chr(Int(26 * Rnd + 65))
+    mi2 = Chr(Int(26 * Rnd + 65))
+    mi3 = Chr(Int(26 * Rnd + 65))
+
+    mistralGrpKey = BV9_CellStr(ws, i, "B")
+
+    If Not mistralAfterBulk.Exists(mistralGrpKey) Then
+        randomNumber1 = ""
+        For j = 1 To 2
+            randomNumber1 = randomNumber1 & CStr(Int(10 * Rnd))
+        Next j
+        randomDigit = Int(10 * Rnd)
+        biMi1 = Chr(Int(26 * Rnd + 65))
+        biMi2 = Chr(Int(26 * Rnd + 65))
+        biMi3 = Chr(Int(26 * Rnd + 65))
+        mistralAfterBulk(mistralGrpKey) = biMi3 & biMi1 & biMi2 & headerdt1 & _
+                                           CStr(randomDigit) & randomNumber1
+    End If
+
+    channel = BV9_CellStr(ws, i, "C")
+    If Len(channel) = 0 Then channel = "SFA"
+
+    mistralContent = "/MISTRAL_SO//" & mi1 & mi2 & mi3 & headerdt1 & randomNumber & _
+                     "//BULK//" & mistralAfterBulk(mistralGrpKey) & "//CHAN//" & channel & "/"
+
+    ustrdBlock = "<Ustrd>" & mistralContent & "</Ustrd>"
+    ' ... rest unchanged
+Next i
